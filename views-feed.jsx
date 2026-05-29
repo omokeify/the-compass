@@ -139,6 +139,25 @@ const SAMPLE_COMMENTS = {
   f9: [],
 };
 
+const FEED_DRAFT_KEY = 'compass_feed_draft_v1';
+const FEED_TYPE_META = {
+  Signal: { icon: 'sparkles', desc: 'Validated insight, alpha, or field note' },
+  Question: { icon: 'chat', desc: 'Ask the community for help or perspective' },
+  Bounty: { icon: 'wallet', desc: 'Share paid work or contribution requests' },
+  Event: { icon: 'calendar', desc: 'Promote classes, meetups, AMAs, and spaces' },
+  Resource: { icon: 'book', desc: 'Drop links, notes, docs, or recaps' },
+};
+
+const readFeedDraft = () => {
+  try { return JSON.parse(localStorage.getItem(FEED_DRAFT_KEY) || '{}'); }
+  catch { return {}; }
+};
+
+const writeFeedDraft = (draft) => {
+  try { localStorage.setItem(FEED_DRAFT_KEY, JSON.stringify(draft)); }
+  catch {}
+};
+
 const ReactionRow = ({ r, liked, reposted, bookmarked, onLike, onComment, onRepost, onBookmark, commentOpen }) => (
   <div className="feed-react">
     <button className={`fr-act ${liked ? 'on' : ''}`} onClick={onLike}>
@@ -236,6 +255,61 @@ const FeedPoll = ({ poll }) => {
   );
 };
 
+const InlineFeedComposer = ({ onCompose }) => {
+  const [draft, setDraft] = React.useState(() => ({
+    type: 'Signal',
+    body: '',
+    ...readFeedDraft(),
+  }));
+
+  React.useEffect(() => writeFeedDraft(draft), [draft]);
+
+  const clearDraft = (e) => {
+    e.stopPropagation();
+    setDraft({ type: draft.type, body: '' });
+  };
+
+  return (
+    <div className="feed-inline-composer">
+      <div className="fic-top">
+        <Avatar user={userByHandle('kelechi.eth')} size={38} />
+        <div className="fic-body">
+          <div className="fic-types">
+            {Object.entries(FEED_TYPE_META).map(([type, meta]) => (
+              <button
+                key={type}
+                className={`fic-type ${draft.type === type ? 'active' : ''}`}
+                title={meta.desc}
+                onClick={() => setDraft(d => ({ ...d, type }))}
+              >
+                <Icon name={meta.icon} size={12} /> {type}
+              </button>
+            ))}
+          </div>
+          <textarea
+            className="fic-input"
+            value={draft.body}
+            placeholder={`Share a ${draft.type.toLowerCase()} with the community...`}
+            onChange={(e) => setDraft(d => ({ ...d, body: e.target.value }))}
+          />
+        </div>
+      </div>
+      <div className="fic-foot">
+        <div className="fic-hint">
+          <Icon name="sparkles" size={12} />
+          Draft saves on this browser.
+        </div>
+        <div className="fic-actions">
+          {draft.body && <button className="btn ghost sm" onClick={clearDraft}>Clear</button>}
+          <button className="btn primary sm" onClick={onCompose}>
+            <Icon name="plus" size={11} /> Open composer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const FeedCard = ({ item, navigate }) => {
   const author = userByHandle(item.author);
   const cat = CATEGORIES.find(c => c.id === item.cat);
@@ -246,6 +320,8 @@ const FeedCard = ({ item, navigate }) => {
   const [commentOpen, setCommentOpen] = React.useState(false);
   const [draft, setDraft] = React.useState('');
   const [comments, setComments] = React.useState(SAMPLE_COMMENTS[item.id] || []);
+  const [reported, setReported] = React.useState(false);
+  const [shared, setShared] = React.useState(false);
 
   const submitComment = () => {
     if (!draft.trim()) return;
@@ -262,6 +338,7 @@ const FeedCard = ({ item, navigate }) => {
             <span className="feed-author">{author.name}</span>
             <TierBadge tier={author.tier} />
             <span className="feed-handle">@{author.handle}</span>
+            <span className="feed-type-pill">{item.type || (item.cat === 'alpha' ? 'Signal' : item.cat === 'activities' ? 'Resource' : 'Update')}</span>
           </div>
           <div className="feed-head-meta">
             <CategoryPill cat={cat} />
@@ -272,7 +349,14 @@ const FeedCard = ({ item, navigate }) => {
             {item.validated && <><Dot /><span className="tr-flag validated"><Icon name="check" size={10} /> validated</span></>}
           </div>
         </div>
-        <button className="btn ghost icon-only" title="More"><Icon name="menu" size={14} /></button>
+        <div className="feed-more">
+          <button className={`btn ghost icon-only ${shared ? 'active' : ''}`} title={shared ? 'Copied' : 'Share'} onClick={() => setShared(true)}>
+            <Icon name="reply" size={14} />
+          </button>
+          <button className={`btn ghost icon-only ${reported ? 'danger-soft' : ''}`} title={reported ? 'Reported' : 'Report'} onClick={() => setReported(true)}>
+            <Icon name={reported ? 'check' : 'menu'} size={14} />
+          </button>
+        </div>
       </header>
 
       <h2 className="feed-title">{item.title}</h2>
@@ -282,6 +366,12 @@ const FeedCard = ({ item, navigate }) => {
           <Icon name="lock" size={13} />
           <span><strong>{item.locked}+ only</strong> — unlock with KP or upgrade your tier.</span>
           <button className="btn solid sm">View details</button>
+        </div>
+      )}
+      {item.cat === 'alpha' && (
+        <div className={`feed-risk ${item.validated ? 'validated' : ''}`}>
+          <Icon name={item.validated ? 'check' : 'lock'} size={12} />
+          <span>{item.validated ? 'Validated by Navigators. Still verify contracts and links before acting.' : 'Alpha is tier-gated until moderators validate the supporting evidence.'}</span>
         </div>
       )}
       <FeedMedia media={item.media} />
