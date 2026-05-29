@@ -9,6 +9,7 @@
     "build": "vite build && npm run copy:static",
     "copy:static": "node scripts/copy-static.mjs",
     "check:routes": "node scripts/check-routes.mjs",
+    "check": "npm run check:routes && npm run build",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {

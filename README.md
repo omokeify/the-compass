@@ -30,6 +30,14 @@ The recommended MVP is:
 
 Supabase + Vercel is the fastest practical path for the first live version.
 
+## Development Checks
+
+```bash
+npm run check
+```
+
+This verifies route mappings and production build output. Build warnings about root-level `.jsx` scripts are expected until the Vite module migration is complete.
+
 ## Repository Notes
 
 Generated folders such as `node_modules/` and `dist/` are ignored. Local pasted upload artifacts are also ignored; keep intentional source assets in a dedicated tracked asset folder as the product architecture matures.
