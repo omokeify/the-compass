@@ -24,7 +24,7 @@ The next architecture milestone is a bundled Vite React app:
 
 ## Migration Order
 
-1. Move route helpers into `src/app/routes.js`.
+1. Move route helpers into `src/app/routes.js`. Done; `routes.jsx` remains the legacy runtime bridge until `app.jsx` becomes a module.
 2. Move pure utilities and shared components first.
 3. Move `data.jsx` into mock data modules.
 4. Move feature views one section at a time.
