@@ -227,12 +227,12 @@ CREATE POLICY "Authenticated users can create conferences"
 DROP POLICY IF EXISTS "Hosts can update own conferences" ON public.conferences;
 CREATE POLICY "Hosts can update own conferences"
   ON public.conferences FOR UPDATE
-  USING (auth.role() = 'authenticated' AND host = auth.uid()::TEXT);
+  USING (auth.role() = 'authenticated' AND host_id = auth.uid());
 
 DROP POLICY IF EXISTS "Hosts can delete own conferences" ON public.conferences;
 CREATE POLICY "Hosts can delete own conferences"
   ON public.conferences FOR DELETE
-  USING (auth.role() = 'authenticated' AND host = auth.uid()::TEXT);
+  USING (auth.role() = 'authenticated' AND host_id = auth.uid());
 
 -- 10. Spaces (live audio rooms)
 CREATE TABLE IF NOT EXISTS public.spaces (

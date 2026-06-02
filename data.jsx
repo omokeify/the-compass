@@ -1036,6 +1036,8 @@ if (!window.__compass_poller_running) {
       ]);
       if (Array.isArray(spaces)) { SPACES.length = 0; SPACES.push(...spaces); window.dispatchEvent(new Event('compass_spaces_refresh')); }
       if (Array.isArray(conferences)) { CONFERENCES.length = 0; CONFERENCES.push(...conferences); window.dispatchEvent(new Event('compass_conferences_refresh')); }
+      const convos = await messageService.listConversations();
+      if (Array.isArray(convos)) { CONVERSATIONS.length = 0; CONVERSATIONS.push(...convos); window.dispatchEvent(new Event('compass_conversations_refresh')); }
     } catch {}
   }, COMPASS_LIVE_TICK_MS);
 }
