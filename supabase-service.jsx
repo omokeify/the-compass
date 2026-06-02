@@ -205,6 +205,14 @@ const supabaseService = {
     return data.map(p => ({ ...p, name: p.fullname }));
   },
 
+  async listMembers() {
+    const url = `${SUPABASE_URL}/rest/v1/profiles?select=id,handle,fullname,avatar,hue,kp,tier,role,loc,region,sectors,online,photo&order=fullname.asc`;
+    const res = await fetch(url, { headers: { 'apikey': SUPABASE_ANON_KEY } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.map(p => ({ ...p, name: p.fullname, isMe: false }));
+  },
+
   async getSuggestedUsers(excludeHandle) {
     const url = `${SUPABASE_URL}/rest/v1/profiles?select=id,handle,fullname,avatar,hue,kp,tier&handle=neq.${encodeURIComponent(excludeHandle || '')}&order=kp.desc&limit=5`;
     const res = await fetch(url, { headers: { 'apikey': SUPABASE_ANON_KEY } });

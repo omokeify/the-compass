@@ -1,13 +1,17 @@
-// Members directory — searchable grid with filter sidebar
-
 const MembersPage = ({ navigate, onOpenCard }) => {
+  const [members, setMembers] = React.useState([]);
   const [search, setSearch]   = React.useState('');
   const [locQuery, setLocQuery] = React.useState('');
   const [regions, setRegions] = React.useState(new Set());
   const [sectors, setSectors] = React.useState(new Set());
-  const [tab, setTab]         = React.useState('all'); // all | bookmarked
+  const [tab, setTab]         = React.useState('all');
   const [bookmarks, setBookmarks] = React.useState(new Set());
   const [showAllSectors, setShowAllSectors] = React.useState(false);
+
+  React.useEffect(() => {
+    const sb = window.supabaseService;
+    if (sb) sb.listMembers().then(setMembers).catch(() => {});
+  }, []);
 
   const toggleSet = (setter, v) => setter(curr => {
     const n = new Set(curr);
@@ -21,17 +25,17 @@ const MembersPage = ({ navigate, onOpenCard }) => {
     setSectors(new Set());
   };
 
-  const filtered = MEMBERS.filter(m => {
+  const filtered = members.filter(m => {
     if (tab === 'bookmarked' && !bookmarks.has(m.handle)) return false;
     if (search) {
       const q = search.toLowerCase();
-      if (!m.name.toLowerCase().includes(q) &&
-          !m.handle.toLowerCase().includes(q) &&
-          !m.role.toLowerCase().includes(q)) return false;
+      if (!(m.name || '').toLowerCase().includes(q) &&
+          !(m.handle || '').toLowerCase().includes(q) &&
+          !(m.role || '').toLowerCase().includes(q)) return false;
     }
-    if (locQuery && !m.loc.toLowerCase().includes(locQuery.toLowerCase())) return false;
+    if (locQuery && !(m.loc || '').toLowerCase().includes(locQuery.toLowerCase())) return false;
     if (regions.size > 0 && !regions.has(m.region)) return false;
-    if (sectors.size > 0 && !m.sectors.some(s => sectors.has(s))) return false;
+    if (sectors.size > 0 && !(m.sectors || []).some(s => sectors.has(s))) return false;
     return true;
   });
 
@@ -40,7 +44,6 @@ const MembersPage = ({ navigate, onOpenCard }) => {
   return (
     <div className="view members-view">
       <div className="mv-layout">
-        {/* Filter rail */}
         <aside className="mv-filters">
           <div className="mv-search">
             <Icon name="search" size={13} />
@@ -99,11 +102,9 @@ const MembersPage = ({ navigate, onOpenCard }) => {
 
           <div className="mv-filter-foot">
             <button className="btn ghost sm" onClick={clearFilters}>Clear</button>
-            <button className="btn primary sm">Apply</button>
           </div>
         </aside>
 
-        {/* Members grid */}
         <main className="mv-main">
           <header className="mv-head">
             <div className="mv-count">{filtered.length} members</div>
