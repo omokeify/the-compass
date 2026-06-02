@@ -998,6 +998,15 @@ const spaceService = {
     if (typeof s.when_text === 'string') s.scheduled = s.when_text;
     s.listeners = Number(s.listeners) || 0;
     s.reminders = Number(s.reminders) || 0;
+    s.startedAt = s.started_at || s.started || null;
+    if (s.started_at && s.ended_at) {
+      const ms = new Date(s.ended_at) - new Date(s.started_at);
+      const mins = Math.floor(ms / 60000);
+      const secs = Math.floor((ms % 60000) / 1000);
+      s.duration = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+    } else {
+      s.duration = s.duration || null;
+    }
     return s;
   },
 

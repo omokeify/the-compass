@@ -591,6 +591,7 @@ const supabaseService = {
         ),
         listeners: Number(space.listeners) || 0,
         status: space.status || 'live',
+        started_at: space.status === 'live' ? new Date().toISOString() : null,
         when_text: space.scheduled || space.when || '',
         scheduled_iso: space.scheduledISO || null,
         cover: space.cover || 215,
@@ -616,6 +617,8 @@ const supabaseService = {
     if (changes.scheduled_iso !== undefined) body.scheduled_iso = changes.scheduled_iso;
     if (changes.reminder_handles !== undefined) body.reminder_handles = JSON.stringify(changes.reminder_handles);
     if (changes.reminders !== undefined) body.reminders = Number(changes.reminders);
+    if (changes.started_at !== undefined) body.started_at = changes.started_at;
+    if (changes.ended_at !== undefined) body.ended_at = changes.ended_at;
     const res = await fetch(`${SUPABASE_URL}/rest/v1/spaces?id=eq.${id}`, {
       method: 'PATCH',
       headers: authHeaders(),

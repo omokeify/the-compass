@@ -1,6 +1,17 @@
 // Spaces — live audio rooms (Twitter Spaces / X Spaces style)
 
 const genId = () => 'space_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+const timeAgo = (date) => {
+  if (!date) return '';
+  const diff = Date.now() - new Date(date).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ${mins % 60}m ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+};
 
 const SpacesPage = ({ navigate, currentUser, onJoinSpace }) => {
   const [tab, setTab] = React.useState('all');
@@ -114,8 +125,9 @@ const SpaceCard = ({ space, currentUser, onJoin, navigate }) => {
               <span><strong>{space.listeners}</strong> listening</span>
               <Dot />
               <span><strong>{space.speakers}</strong> speakers</span>
-              <Dot />
-              <span>{space.started}</span>
+              {space.startedAt && (
+                <><Dot /><span title={new Date(space.startedAt).toLocaleString()}>{timeAgo(space.startedAt)}</span></>
+              )}
             </div>
             <button className="btn primary sm" onClick={onJoin}>
               <Icon name="mic" size={11} /> Join
@@ -137,8 +149,10 @@ const SpaceCard = ({ space, currentUser, onJoin, navigate }) => {
           <>
             <div className="sc-meta">
               <span><strong>{space.listeners}</strong> listened</span>
-              <Dot />
-              <span>{space.duration}</span>
+              {space.duration && <><Dot /><span>{space.duration}</span></>}
+              {space.startedAt && (
+                <><Dot /><span title={new Date(space.startedAt).toLocaleString()}>{timeAgo(space.startedAt)}</span></>
+              )}
             </div>
             <button className="btn ghost sm" onClick={onJoin}>
               <Icon name="play" size={11} /> Play
@@ -199,7 +213,6 @@ const CreateSpaceModal = ({ currentUser, onClose, onCreated }) => {
       cohosts: [],
       listeners: 0,
       speakers: 1,
-      started: mode === 'now' ? 'now' : null,
       scheduled: null,
       scheduledISO: null,
       topic,
@@ -496,7 +509,7 @@ const LiveSpaceDrawer = ({ space, onClose, currentUser }) => {
   const confirmEnd = async () => {
     const room = roomRef.current;
     if (room) room.disconnect();
-    await spaceService.update(space.id, { status: 'replay', listeners: 0 });
+    await spaceService.update(space.id, { status: 'replay', listeners: 0, ended_at: new Date().toISOString() });
     onClose();
   };
 
