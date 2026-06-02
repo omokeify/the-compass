@@ -9,7 +9,10 @@ const ClassCard = ({ cls, registered, onRegister, onJoin, onManage, admin, curre
   const seatsLeft = cls.capacity - cls.registered;
   const pct = Math.min(100, Math.round((cls.registered / cls.capacity) * 100));
   const isReg = registered && registered.has(cls.id);
-  const attended = currentUser && hasAttended(currentUser.handle, cls.id);
+  const [attended, setAttended] = React.useState(false);
+  React.useEffect(() => {
+    if (currentUser) hasAttended(currentUser.handle, cls.id).then(setAttended);
+  }, [currentUser, cls.id]);
 
   return (
     <article className={`class-card status-${cls.status}`}>

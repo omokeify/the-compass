@@ -399,7 +399,16 @@ const talentTemplate = [
 const talentService = {
   _key: TALENT_KEY_APPROVED,
 
+  _sb() { return window.supabaseService?.getSession()?.access_token ? window.supabaseService : null; },
+
   async init() {
+    const sb = this._sb();
+    if (sb) {
+      const list = await sb.listTalents();
+      TALENT.length = 0;
+      TALENT.push(...(list || []).map(t => this._normTalent(t)));
+      return [...TALENT];
+    }
     try {
       const raw = localStorage.getItem(this._key);
       if (raw) {
@@ -420,7 +429,21 @@ const talentService = {
     try { localStorage.setItem(this._key, JSON.stringify(TALENT)); } catch {}
   },
 
+  _normTalent(raw) {
+    if (!raw) return null;
+    return {
+      ...raw,
+      cardBg: raw.card_bg || raw.cardBg,
+      bgHue: raw.bg_hue ?? raw.bgHue,
+      successRate: raw.success_rate ?? raw.successRate,
+      topRated: raw.top_rated ?? raw.topRated,
+      reviewList: raw.review_list || raw.reviewList || [],
+    };
+  },
+
   async list(currentUser) {
+    const sb = this._sb();
+    if (sb) return (sb.listTalents() || []).map(t => this._normTalent(t));
     let list = [...TALENT];
     if (!this._isAdmin(currentUser)) {
       list = list.filter(t => t.approved);
@@ -428,7 +451,15 @@ const talentService = {
     return list;
   },
 
-  async get(id) { return TALENT.find(t => t.id === id) || null; },
+  async get(id) {
+    const sb = this._sb();
+    if (sb) {
+      const gig = TALENT.find(t => t.id === id);
+      if (gig) return gig;
+      return this._normTalent(await sb.getTalent?.(id) || null);
+    }
+    return TALENT.find(t => t.id === id) || null;
+  },
 
   _isAdmin(u) { return u && (u.role === 'admin' || u.role === 'mod'); },
   _canCreate(u) {
@@ -445,20 +476,20 @@ const talentService = {
       if (approved.includes(currentUser.handle)) throw new Error('Your talent account is approved. You can post gigs.');
       throw new Error('Only approved talents, admins, and moderators can list gigs.');
     }
+    const sb = this._sb();
+    if (sb) return sb.createTalent(data);
     if (!data.id) data.id = 't-' + Date.now().toString(36);
     if (!data.packages) data.packages = [];
     if (!data.reviewList) data.reviewList = [];
-    if (this._isAdmin(currentUser)) {
-      data.approved = true;
-    } else {
-      data.approved = true;
-    }
+    data.approved = true;
     TALENT.push(data);
     this._persist();
     return data;
   },
 
   async update(id, changes, currentUser) {
+    const sb = this._sb();
+    if (sb) { return sb.updateTalent(id, changes); }
     const gig = TALENT.find(t => t.id === id);
     if (!gig) throw new Error('Gig not found.');
     if (!this._canUpdate(gig, currentUser)) throw new Error('Only the talent, admins, and moderators can edit this gig.');
@@ -468,6 +499,8 @@ const talentService = {
   },
 
   async delete(id, currentUser) {
+    const sb = this._sb();
+    if (sb) { await sb.deleteTalent(id); return true; }
     const idx = TALENT.findIndex(t => t.id === id);
     if (idx === -1) throw new Error('Gig not found.');
     if (!this._canDelete(currentUser)) throw new Error('Only admins and moderators can delete gigs.');
@@ -478,6 +511,8 @@ const talentService = {
 
   async setFeatured(id, on, currentUser) {
     if (!this._isAdmin(currentUser)) throw new Error('Only admins and moderators can set featured status.');
+    const sb = this._sb();
+    if (sb) { return sb.setTalentFeatured(id, on); }
     const gig = TALENT.find(t => t.id === id);
     if (!gig) throw new Error('Gig not found.');
     gig.featured = !!on;
@@ -731,11 +766,18 @@ const ATTENDANCE_KEY = 'compass_attendance_v1';
 const KP_LOG_KEY = 'compass_kp_v1';
 const KP_PER_CLASS = 50;
 
+const _sb = () => window.supabaseService?.getSession()?.access_token ? window.supabaseService : null;
+
 const readAttendance = () => {
   try { return JSON.parse(localStorage.getItem(ATTENDANCE_KEY)) || {}; } catch { return {}; }
 };
 
-const hasAttended = (handle, classId) => {
+const hasAttended = async (handle, classId) => {
+  const sb = _sb();
+  if (sb) {
+    const ids = await sb.getAttendedClasses();
+    return ids.includes(classId);
+  }
   const att = readAttendance();
   return att[handle] && att[handle].includes(classId);
 };
@@ -744,7 +786,12 @@ const readKpLog = () => {
   try { return JSON.parse(localStorage.getItem(KP_LOG_KEY)) || {}; } catch { return {}; }
 };
 
-const awardAttendance = (handle, classId, className) => {
+const awardAttendance = async (handle, classId, className) => {
+  const sb = _sb();
+  if (sb) {
+    const result = await sb.recordAttendance(classId);
+    return result.kp;
+  }
   const att = readAttendance();
   if (!att[handle]) att[handle] = [];
   if (att[handle].includes(classId)) return 0;
@@ -763,12 +810,16 @@ const awardAttendance = (handle, classId, className) => {
   return KP_PER_CLASS;
 };
 
-const getKpSummary = (handle) => {
+const getKpSummary = async (handle) => {
+  const sb = _sb();
+  if (sb) return sb.getKpSummary();
   const kpStore = readKpLog();
   return kpStore[handle] || { total: 0, log: [] };
 };
 
-const getAttendedClasses = (handle) => {
+const getAttendedClasses = async (handle) => {
+  const sb = _sb();
+  if (sb) return sb.getAttendedClasses();
   const att = readAttendance();
   return att[handle] || [];
 };
@@ -788,7 +839,27 @@ const QUESTS = [];
 const questService = {
   _key: QUESTS_KEY,
 
+  _sb() { return window.supabaseService?.getSession()?.access_token ? window.supabaseService : null; },
+
   async today() {
+    const sb = this._sb();
+    if (sb) {
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const saved = await sb.getQuests(dateStr);
+      if (saved?.length) {
+        const list = QUESTS_TEMPLATE.map(t => {
+          const found = saved.find(s => s.quest_id === t.id);
+          return { ...t, done: found?.done || false };
+        });
+        QUESTS.length = 0;
+        QUESTS.push(...list);
+        return list;
+      }
+      const list = QUESTS_TEMPLATE.map(q => ({ ...q, done: false }));
+      QUESTS.length = 0;
+      QUESTS.push(...list);
+      return list;
+    }
     const today = new Date().toDateString();
     try {
       const raw = localStorage.getItem(this._key);
@@ -805,6 +876,11 @@ const questService = {
   },
 
   async reset() {
+    const sb = this._sb();
+    if (sb) {
+      const dateStr = new Date().toISOString().slice(0, 10);
+      await sb.resetQuests(dateStr);
+    }
     const list = QUESTS_TEMPLATE.map(q => ({ ...q, done: false }));
     QUESTS.length = 0;
     QUESTS.push(...list);
@@ -825,6 +901,13 @@ const questService = {
         q.done = false;
         return false;
       }
+    }
+
+    const sb = this._sb();
+    if (sb) {
+      const dateStr = new Date().toISOString().slice(0, 10);
+      await sb.completeQuest(id, dateStr);
+      await sb.awardKp(q.kp, 'quest', id, q.label);
     }
 
     if (window.currentUser && window.currentUser.handle) {

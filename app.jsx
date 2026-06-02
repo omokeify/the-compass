@@ -94,8 +94,13 @@ function App() {
 
   const signUp = async ({ email, password, name, handle }) => {
     try {
-      const { user } = await supabaseService.signUp({ email, password, fullname: name, handle });
-      setCurrentUser(mapSbProfile(user, { handle, fullname: name }));
+      const result = await supabaseService.signUp({ email, password, fullname: name, handle });
+      if (result.needsConfirm) {
+        showToast('Check your email for a confirmation link to activate your account.');
+        return;
+      }
+      const profile = await supabaseService.getProfile(result.user.id);
+      setCurrentUser(mapSbProfile(result.user, profile));
       setLoggedIn(true);
       setOnboard(true);
       navigate({ view: 'feed' });

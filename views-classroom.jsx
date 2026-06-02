@@ -323,7 +323,7 @@ const ClassroomView = ({ cls, currentUser, onLeave }) => {
 
   const endClass = async () => {
     const allHandles = new Set([cls.host, ...(cls.registrants || [])]);
-    allHandles.forEach(h => awardAttendance(h, cls.id, cls.title));
+    for (const h of allHandles) await awardAttendance(h, cls.id, cls.title);
     await conferenceService.end(cls.id);
     cls.status = 'ended';
     onLeave();

@@ -82,9 +82,11 @@ const supabaseService = {
     });
     const data = await res.json();
     if (res.ok) {
-      // Auto-create profile row is handled by the DB trigger
-      if (data.access_token) setSession(data);
-      return { user: data.user, session: data };
+      if (data.access_token) {
+        setSession(data);
+        return { user: data.user, session: data, needsConfirm: false };
+      }
+      return { user: data.user, session: null, needsConfirm: true };
     }
     throw new Error(data.msg || data.error_description || 'Signup failed');
   },
@@ -616,6 +618,184 @@ const supabaseService = {
       body: JSON.stringify({ last_message: text, last_when: new Date().toISOString() }),
     });
     return res.ok;
+  },
+
+  // ===== Talent Gigs =====
+  async listTalents() {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/talent_gigs?select=*&order=created_at.desc`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async getTalent(id) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/talent_gigs?id=eq.${encodeURIComponent(id)}&select=*`, { headers: authHeaders() });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.[0] || null;
+  },
+
+  async createTalent(data) {
+    const session = getSession();
+    if (!session?.user?.id) throw new Error('Not authenticated');
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/talent_gigs`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        id: data.id || 't-' + Date.now().toString(36),
+        author_id: session.user.id,
+        author: data.author || session.user.user_metadata?.handle || 'user',
+        skill: data.skill || '',
+        role: data.role || '',
+        title: data.title,
+        bio: data.bio || '',
+        tags: data.tags || [],
+        rating: data.rating || 0,
+        reviews: data.reviews || 0,
+        projects: data.projects || 0,
+        success_rate: data.successRate || 0,
+        price: data.price || 0,
+        card_bg: data.cardBg || '#f5f3ff',
+        bg_hue: data.bgHue || 260,
+        featured: data.featured || false,
+        top_rated: data.topRated || false,
+        approved: data.approved !== false,
+        description: data.description || '',
+        packages: data.packages || [],
+        review_list: data.reviewList || [],
+      }),
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Failed to create gig'); }
+    return res.json();
+  },
+
+  async updateTalent(id, changes) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/talent_gigs?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(changes),
+    });
+    return res.ok;
+  },
+
+  async deleteTalent(id) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/talent_gigs?id=eq.${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    return res.ok;
+  },
+
+  async setTalentFeatured(id, featured) {
+    return this.updateTalent(id, { featured });
+  },
+
+  // ===== Quests =====
+  async getQuests(date) {
+    const session = getSession();
+    if (!session?.user?.id) return [];
+    const dateStr = date || new Date().toISOString().slice(0, 10);
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/quests?user_id=eq.${session.user.id}&date=eq.${dateStr}&select=*`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async completeQuest(questId, date) {
+    const session = getSession();
+    if (!session?.user?.id) throw new Error('Not authenticated');
+    const dateStr = date || new Date().toISOString().slice(0, 10);
+    const existing = await this.getQuests(dateStr);
+    const found = existing.find(q => q.quest_id === questId);
+    if (found) {
+      await fetch(`${SUPABASE_URL}/rest/v1/quests?id=eq.${found.id}`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ done: true }),
+      });
+    } else {
+      await fetch(`${SUPABASE_URL}/rest/v1/quests`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ user_id: session.user.id, date: dateStr, quest_id: questId, done: true }),
+      });
+    }
+    return true;
+  },
+
+  async resetQuests(date) {
+    const session = getSession();
+    if (!session?.user?.id) return;
+    const dateStr = date || new Date().toISOString().slice(0, 10);
+    await fetch(`${SUPABASE_URL}/rest/v1/quests?user_id=eq.${session.user.id}&date=eq.${dateStr}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+  },
+
+  // ===== Attendance & KP =====
+  async recordAttendance(conferenceId) {
+    const session = getSession();
+    if (!session?.user?.id) throw new Error('Not authenticated');
+    const check = await fetch(`${SUPABASE_URL}/rest/v1/attendance?user_id=eq.${session.user.id}&conference_id=eq.${encodeURIComponent(conferenceId)}`, { headers: authHeaders() });
+    const existing = await check.json();
+    if (existing?.length > 0) return { recorded: false, kp: 0 };
+    await fetch(`${SUPABASE_URL}/rest/v1/attendance`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ user_id: session.user.id, conference_id: conferenceId }),
+    });
+    const kpAmount = 50;
+    await fetch(`${SUPABASE_URL}/rest/v1/kp_log`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ user_id: session.user.id, amount: kpAmount, source: 'attendance', source_id: conferenceId, description: 'Class attendance' }),
+    });
+    const profileRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${session.user.id}&select=kp`, { headers: authHeaders() });
+    const profile = await profileRes.json();
+    const currentKp = profile?.[0]?.kp || 0;
+    await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${session.user.id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ kp: currentKp + kpAmount }),
+    });
+    return { recorded: true, kp: kpAmount };
+  },
+
+  async awardKp(amount, source, sourceId, description) {
+    const session = getSession();
+    if (!session?.user?.id) throw new Error('Not authenticated');
+    await fetch(`${SUPABASE_URL}/rest/v1/kp_log`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ user_id: session.user.id, amount, source, source_id: sourceId || '', description: description || '' }),
+    });
+    const profileRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${session.user.id}&select=kp`, { headers: authHeaders() });
+    const profile = await profileRes.json();
+    const currentKp = profile?.[0]?.kp || 0;
+    await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${session.user.id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ kp: currentKp + amount }),
+    });
+  },
+
+  async getKpSummary() {
+    const session = getSession();
+    if (!session?.user?.id) return { total: 0, log: [] };
+    const profileRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${session.user.id}&select=kp`, { headers: authHeaders() });
+    const profile = await profileRes.json();
+    const total = profile?.[0]?.kp || 0;
+    const logRes = await fetch(`${SUPABASE_URL}/rest/v1/kp_log?user_id=eq.${session.user.id}&order=created_at.desc&limit=100`, { headers: authHeaders() });
+    const log = logRes.ok ? await logRes.json() : [];
+    return { total, log };
+  },
+
+  async getAttendedClasses() {
+    const session = getSession();
+    if (!session?.user?.id) return [];
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/attendance?user_id=eq.${session.user.id}&select=conference_id`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    const rows = await res.json();
+    return rows.map(r => r.conference_id);
   },
 };
 

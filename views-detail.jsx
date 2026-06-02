@@ -462,7 +462,8 @@ const PublicPanel = ({ u, tab, navigate }) => {
 };
 
 const KPBreakdownPanel = ({ u }) => {
-  const kpLog = getKpSummary(u.handle);
+  const [kpLog, setKpLog] = React.useState({ total: 0, log: [] });
+  React.useEffect(() => { getKpSummary(u.handle).then(setKpLog); }, [u.handle]);
   return (
     <div className="kp-breakdown-card">
       <div className="kp-breakdown-header">
@@ -912,9 +913,13 @@ const DashSchedule = ({ u }) => {
 };
 
 const DashCourses = ({ u }) => {
-  const attended = getAttendedClasses(u.handle);
+  const [attended, setAttended] = React.useState([]);
+  const [kpLog, setKpLog] = React.useState({ total: 0, log: [] });
+  React.useEffect(() => {
+    getAttendedClasses(u.handle).then(setAttended);
+    getKpSummary(u.handle).then(setKpLog);
+  }, [u.handle]);
   const classes = CONFERENCES.filter(c => attended.includes(c.id));
-  const kpLog = getKpSummary(u.handle);
 
   return (
     <>

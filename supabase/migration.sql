@@ -365,3 +365,118 @@ DROP POLICY IF EXISTS "Senders can delete own messages" ON public.messages;
 CREATE POLICY "Senders can delete own messages"
   ON public.messages FOR DELETE
   USING (sender_id = auth.uid());
+
+-- =============================================================
+-- 5. Talent gigs
+-- =============================================================
+CREATE TABLE IF NOT EXISTS public.talent_gigs (
+  id TEXT PRIMARY KEY,
+  author_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  author TEXT NOT NULL,
+  skill TEXT NOT NULL DEFAULT '',
+  role TEXT NOT NULL DEFAULT '',
+  title TEXT NOT NULL,
+  bio TEXT DEFAULT '',
+  tags JSONB DEFAULT '[]',
+  rating NUMERIC DEFAULT 0,
+  reviews INTEGER DEFAULT 0,
+  projects INTEGER DEFAULT 0,
+  success_rate INTEGER DEFAULT 0,
+  price NUMERIC DEFAULT 0,
+  card_bg TEXT DEFAULT '#f5f3ff',
+  bg_hue INTEGER DEFAULT 260,
+  featured BOOLEAN DEFAULT false,
+  top_rated BOOLEAN DEFAULT false,
+  approved BOOLEAN DEFAULT false,
+  description TEXT DEFAULT '',
+  packages JSONB DEFAULT '[]',
+  review_list JSONB DEFAULT '[]',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.talent_gigs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can view approved talent gigs"
+  ON public.talent_gigs FOR SELECT
+  USING (approved = true OR auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated users can insert own gigs"
+  ON public.talent_gigs FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated' AND author_id = auth.uid());
+
+CREATE POLICY "Authors can update own gigs, admins all"
+  ON public.talent_gigs FOR UPDATE
+  USING (author_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','mod')));
+
+CREATE POLICY "Admins can delete gigs"
+  ON public.talent_gigs FOR DELETE
+  USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','mod')));
+
+-- =============================================================
+-- 6. Quests (daily)
+-- =============================================================
+CREATE TABLE IF NOT EXISTS public.quests (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  quest_id TEXT NOT NULL,
+  done BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, date, quest_id)
+);
+
+ALTER TABLE public.quests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own quests"
+  ON public.quests FOR SELECT
+  USING (auth.role() = 'authenticated' AND user_id = auth.uid());
+
+CREATE POLICY "Users can insert own quests"
+  ON public.quests FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated' AND user_id = auth.uid());
+
+CREATE POLICY "Users can update own quests"
+  ON public.quests FOR UPDATE
+  USING (user_id = auth.uid());
+
+-- =============================================================
+-- 7. Attendance & KP log
+-- =============================================================
+CREATE TABLE IF NOT EXISTS public.attendance (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  conference_id UUID REFERENCES public.conferences(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, conference_id)
+);
+
+ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own attendance"
+  ON public.attendance FOR SELECT
+  USING (auth.role() = 'authenticated' AND user_id = auth.uid());
+
+CREATE POLICY "Users can insert own attendance"
+  ON public.attendance FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated' AND user_id = auth.uid());
+
+CREATE TABLE IF NOT EXISTS public.kp_log (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  amount INTEGER NOT NULL,
+  source TEXT NOT NULL,
+  source_id TEXT DEFAULT '',
+  description TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.kp_log ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own kp_log"
+  ON public.kp_log FOR SELECT
+  USING (auth.role() = 'authenticated' AND user_id = auth.uid());
+
+CREATE POLICY "Users can insert own kp_log"
+  ON public.kp_log FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated' AND user_id = auth.uid());
