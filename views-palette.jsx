@@ -54,7 +54,7 @@ const CommandPalette = ({ onClose, navigate, currentUser }) => {
   const flat = results.flatMap(r => r.items);
   const go = (item) => {
     onClose();
-    if (item.kind === 'nav') navigate(item.tab ? { view: item.view, handle: currentUser?.handle || 'testuser', tab: item.tab } : { view: item.view });
+    if (item.kind === 'nav') navigate(item.tab ? { view: item.view, handle: currentUser?.handle || '', tab: item.tab } : { view: item.view });
     else if (item.kind === 'member') navigate({ view: 'profile', handle: item.handle });
     else if (item.kind === 'topic') navigate({ view: 'topic', topic: item.id });
     else if (item.kind === 'gig') navigate({ view: 'gig', id: item.id });

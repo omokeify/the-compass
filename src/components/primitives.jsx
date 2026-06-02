@@ -108,11 +108,15 @@ export function CategoryPill({ cat, onClick }) {
 }
 
 const TIER_STYLES = {
-  Cadet: { c: '#3a4878', bg: '#dde2f0' },
+  Explorer: { c: '#3a4878', bg: '#dde2f0' },
   Scout: { c: '#1d4329', bg: '#d9ecdf' },
+  Pathfinder: { c: '#5a4a2a', bg: '#f4e8c1' },
   Navigator: { c: '#6b3f00', bg: '#fbedcc' },
-  Captain: { c: '#7a1f06', bg: '#fde2dc' },
-  Official: { c: '#241540', bg: '#ece5fb' },
+  Wayfinder: { c: '#7a1f06', bg: '#fde2dc' },
+  Trailblazer: { c: '#241540', bg: '#ece5fb' },
+  Vanguard: { c: '#4e2a1d', bg: '#f8d9da' },
+  'Compass Elite': { c: '#0c2a1f', bg: '#d6f0e8' },
+  'Compass Legend': { c: '#7a006d', bg: '#f5e1f7' },
 };
 
 export function TierBadge({ tier }) {

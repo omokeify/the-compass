@@ -1,15 +1,33 @@
 // Topic, Profile, Leaderboard, Events, Tag, Composer — modern light edition
 
 // ---------- Topic Detail ----------
+const TOPIC_META_KEY = 'compass_topic_meta_v1';
+
+function loadTopicMeta() {
+  try { return JSON.parse(localStorage.getItem(TOPIC_META_KEY) || '{}'); } catch { return {}; }
+}
+
+function saveTopicMeta(meta) {
+  try { localStorage.setItem(TOPIC_META_KEY, JSON.stringify(meta)); } catch {}
+}
+
 const TopicPage = ({ topicId, navigate, currentUser }) => {
   const topic = TOPICS.find(t => t.id === topicId);
   if (!topic) return <div className="view"><div className="empty">Topic not found.</div></div>;
   const cat = CATEGORIES.find(c => c.id === topic.cat);
   const author = userByHandle(topic.author);
+  const savedMeta = loadTopicMeta();
+  const topicMeta = savedMeta[topicId] || {};
   const [reply, setReply] = React.useState('');
-  const [likes, setLikes] = React.useState(topic.likes);
-  const [liked, setLiked] = React.useState(false);
-  const [replies, setReplies] = React.useState(topic.replyThread || []);
+  const [likes, setLikes] = React.useState(topicMeta.likes !== undefined ? topicMeta.likes : topic.likes);
+  const [liked, setLiked] = React.useState(topicMeta.liked || false);
+  const [replies, setReplies] = React.useState(topicMeta.replies || topic.replyThread || []);
+
+  const persistMeta = (meta) => {
+    const all = loadTopicMeta();
+    all[topicId] = { ...all[topicId], ...meta };
+    saveTopicMeta(all);
+  };
 
   const canView = canViewTopic(currentUser, topic);
   const canReply = canReplyTopic(currentUser, topic);
@@ -18,8 +36,19 @@ const TopicPage = ({ topicId, navigate, currentUser }) => {
 
   const submitReply = () => {
     if (!reply.trim() || !canReply) return;
-    setReplies(r => [...r, { author: currentUser.handle, when: 'just now', body: reply.trim(), likes: 0 }]);
+    const newReply = { author: currentUser.handle, when: 'just now', body: reply.trim(), likes: 0 };
+    const updated = [...replies, newReply];
+    setReplies(updated);
+    persistMeta({ replies: updated });
     setReply('');
+  };
+
+  const toggleLike = () => {
+    const nextLiked = !liked;
+    const nextLikes = nextLiked ? likes + 1 : likes - 1;
+    setLiked(nextLiked);
+    setLikes(nextLikes);
+    persistMeta({ liked: nextLiked, likes: nextLikes });
   };
 
   if (!canView) {
@@ -90,7 +119,7 @@ const TopicPage = ({ topicId, navigate, currentUser }) => {
             </div>
           )}
           <div className="post-actions">
-            <button className={`post-act ${liked ? 'on' : ''}`} onClick={() => { setLiked(!liked); setLikes(l => liked ? l-1 : l+1); }}>
+            <button className={`post-act ${liked ? 'on' : ''}`} onClick={toggleLike}>
               <Icon name="arrow-up" size={13} />
               <span>{likes}</span>
             </button>
@@ -185,9 +214,9 @@ const PROFILE_MENU = [
 const readFollowingList = () => {
   try {
     const list = localStorage.getItem('compass_following_v1');
-    return list ? JSON.parse(list) : ['testuser'];
+    return list ? JSON.parse(list) : [];
   } catch {
-    return ['testuser'];
+    return [];
   }
 };
 
@@ -261,9 +290,9 @@ const ProfilePage = ({ handle, navigate, tab, currentUser }) => {
           </nav>
         </aside>
 
-        <main className="dash-content">
-          <DashboardPanel u={u} tab={active} navigate={navigate} />
-        </main>
+<main className="dash-content">
+           <DashboardPanel u={u} tab={active} navigate={navigate} currentUser={currentUser} />
+         </main>
       </div>
     </div>
   );
@@ -281,7 +310,7 @@ const PublicProfilePage = ({ u, activeTab, selectTab, navigate }) => {
   const [availability, setAvailability] = React.useState(() => {
     try {
       const saved = localStorage.getItem(`compass_availability_${u.handle}`);
-      return saved || (u.handle === 'testuser' ? 'Open to opportunities' : 'Hiring');
+      return saved || '';
     } catch {
       return 'Open to gigs';
     }
@@ -586,7 +615,7 @@ const DashboardPanel = ({ u, tab, navigate }) => {
   if (tab === 'overview')      return <DashOverview u={u} navigate={navigate} />;
   if (tab === 'edit')          return <DashEditProfile u={u} />;
   if (tab === 'saved')         return <SavedPage navigate={navigate} embedded />;
-  if (tab === 'wallet')        return <WalletPage navigate={navigate} embedded />;
+  if (tab === 'wallet')        return <WalletPage navigate={navigate} currentUser={currentUser} embedded />;
   if (tab === 'groups')        return <DashGroups u={u} />;
   if (tab === 'schedule')      return <DashSchedule u={u} />;
   if (tab === 'courses')       return <DashCourses u={u} />;
@@ -692,13 +721,13 @@ const DashEditProfile = ({ u }) => {
         <div className="field-grid">
           <Field label="Full name" value={u.name} />
           <Field label="Handle" value={u.handle} hint="compass.community/@your-handle" />
-          <Field label="Email" value="testuser@compass.community" type="email" />
+          <Field label="Email" value={u.email || ''} type="email" />
           <Field label="Location" value={u.loc} />
           <div style={{ gridColumn: '1 / -1' }}>
             <Field label="Bio" value={u.bio} textarea />
           </div>
-          <Field label="X / Twitter" value="@testuser" />
-           <Field label="Farcaster" value="testuser" />
+          <Field label="X / Twitter" value={u.x || ''} />
+          <Field label="Farcaster" value={u.farcaster || ''} />
         </div>
       </div>
     </>
@@ -1237,7 +1266,7 @@ const Composer = ({ onClose, defaultCat, currentUser }) => {
     // If using Supabase, create a real post
     if (currentUser.id && window.supabaseService) {
       try {
-        await supabaseService.createPost({
+        await window.supabaseService.createPost({
           title: finalTitle,
           body,
           type: postType === 'blog' ? 'Resource' : 'Signal',

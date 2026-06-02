@@ -80,7 +80,7 @@ const HomeFeedStream = ({ navigate, onCompose }) => {
       <div className="home-feed-layout">
         <div className="home-feed-col">
           <div className="feed-composer" onClick={onCompose}>
-            <Avatar user={userByHandle('testuser')} size={36} />
+            <Avatar user={currentUser} size={36} />
             <span className="fc-prompt">Share a signal, an alpha, or a question…</span>
             <span className="fc-tools">
               <Icon name="image" size={14} />
@@ -293,7 +293,7 @@ const HeroCard = ({ navigate, onCompose, onSignup }) => {
             </button>
           </div>
           <div className="hero-trust">
-            <AvatarStack handles={['testuser']} size={26} max={5} />
+            <AvatarStack handles={['amara', 'felix', 'zara']} size={26} max={5} />
             <span><strong>4.9</strong> · 1,284 builders trust Compass for their daily edge.</span>
           </div>
         </div>
@@ -363,7 +363,7 @@ const CategoriesSection = ({ navigate, currentUser }) => {
       <div className="section-head">
         <div>
           <div className="section-eyebrow"><span className="section-eyebrow-dot" /> Eight directions</div>
-          <h2 className="section-title">Find your north.</h2>
+          <h2 className="section-title">Your voice. Your people. Your community.</h2>
           <p className="section-sub">
             Every conversation, opportunity and resource — sorted across eight pillars 
             of the Compass community.

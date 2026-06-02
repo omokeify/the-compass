@@ -12,7 +12,7 @@ ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS hue INTEGER DEFAULT 215,
   ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT '',
   ADD COLUMN IF NOT EXISTS loc TEXT DEFAULT '',
-  ADD COLUMN IF NOT EXISTS tier TEXT DEFAULT 'Cadet',
+  ADD COLUMN IF NOT EXISTS tier TEXT DEFAULT 'Explorer',
   ADD COLUMN IF NOT EXISTS kp INTEGER DEFAULT 0,
   ADD COLUMN IF NOT EXISTS role TEXT;
 
@@ -318,12 +318,12 @@ CREATE POLICY "Authenticated users can create conversations"
 
 DROP POLICY IF EXISTS "Participants can update conversations" ON public.conversations;
 CREATE POLICY "Participants can update conversations"
-  ON public.conferences FOR UPDATE
+  ON public.conversations FOR UPDATE
   USING (auth.uid() = ANY (participant_ids));
 
 DROP POLICY IF EXISTS "Participants can delete conversations" ON public.conversations;
 CREATE POLICY "Participants can delete conversations"
-  ON public.conferences FOR DELETE
+  ON public.conversations FOR DELETE
   USING (auth.uid() = ANY (participant_ids));
 
 -- 12. Messages

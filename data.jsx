@@ -10,7 +10,7 @@ const CATEGORIES = [
     hue: 215, // blue
     icon: 'news',
     posts: 1284,
-    moderators: ['testuser'],
+    moderators: ['felix'],
   },
   {
     id: 'alpha',
@@ -21,7 +21,7 @@ const CATEGORIES = [
     hue: 50, // amber
     icon: 'alpha',
     posts: 743,
-    moderators: ['testuser'],
+    moderators: ['amara'],
     premium: true,
   },
   {
@@ -87,14 +87,13 @@ const CATEGORIES = [
 ];
 
 const USERS = [
-  { handle: 'testuser', name: 'Test User', tier: 'Cadet', kp: 0, joined: '2024-01-15', bio: 'Testing the Compass access control features.', loc: 'Accra, GH', avatar: 'T', hue: 215 },
-  { handle: 'amara',   name: 'Amara Osei',      tier: 'Navigator', kp: 5200, joined: '2024-03-10', bio: 'Smart contract auditor with 6 years in DeFi security.', loc: 'Nairobi, KE', avatar: 'A', hue: 260 },
-  { handle: 'felix',   name: 'Felix Nwosu',     tier: 'Captain',   kp: 7800, joined: '2024-02-01', bio: 'Full-stack engineer building on Solana and EVM chains.', loc: 'Lagos, NG', avatar: 'F', hue: 150 },
-  { handle: 'zara',    name: 'Zara Haile',      tier: 'Ranger',    kp: 3100, joined: '2024-05-20', bio: 'Motion designer helping Web3 projects tell better stories.', loc: 'Addis Ababa, ET', avatar: 'Z', hue: 340 },
+   { handle: 'amara',   name: 'Amara Osei',      tier: 'Wayfinder', kp: 5200, joined: '2024-03-10', bio: 'Smart contract auditor with 6 years in DeFi security.', loc: 'Nairobi, KE', avatar: 'A', hue: 260 },
+   { handle: 'felix',   name: 'Felix Nwosu',     tier: 'Trailblazer',   kp: 7800, joined: '2024-02-01', bio: 'Full-stack engineer building on Solana and EVM chains.', loc: 'Lagos, NG', avatar: 'F', hue: 150 },
+   { handle: 'zara',    name: 'Zara Haile',      tier: 'Navigator',    kp: 3100, joined: '2024-05-20', bio: 'Motion designer helping Web3 projects tell better stories.', loc: 'Addis Ababa, ET', avatar: 'Z', hue: 340 },
 ];
 
-const LEVEL_NAMES = ['Cadet', 'Scout', 'Ranger', 'Navigator', 'Captain', 'Commander', 'Marshal', 'Admiral', 'Official'];
-const LEVEL_THRESHOLDS = [0, 1000, 2500, 4500, 7000, 9500, 12500, 16000, 22000];
+const LEVEL_NAMES = ['Explorer', 'Scout', 'Pathfinder', 'Navigator', 'Wayfinder', 'Trailblazer', 'Vanguard', 'Compass Elite', 'Compass Legend'];
+const LEVEL_THRESHOLDS = [0, 200, 600, 1500, 3500, 7000, 12000, 20000, 35000];
 
 const getLevelFromKp = (kp = 0) => {
   let level = 1;
@@ -232,7 +231,7 @@ const messageService = {
     const text = (body || '').trim();
     if (!text) return null;
     if (sb) return sb.sendMessage({ conversationId, body: text });
-    const msg = { id: 'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), from: 'testuser', body: text, when: 'just now' };
+    const msg = { id: 'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), from: window.currentUser?.handle || 'me', body: text, when: 'just now' };
     const msgs = messagesFor(conversationId);
     msgs.push(msg);
     persistMessages();
@@ -284,7 +283,7 @@ const talentTemplate = [
     ],
     reviewList: [
       { who: 'felix', when: '2 weeks ago', rating: 5, body: 'Amara caught a critical reentrancy bug our team missed. Saved us from a major incident. Highly recommend.' },
-      { who: 'testuser', when: '1 month ago', rating: 5, body: 'Thorough and fast. The report was well-structured with clear remediation steps.' },
+      { who: 'amara', when: '1 month ago', rating: 5, body: 'Thorough and fast. The report was well-structured with clear remediation steps.' },
     ],
   },
   {
@@ -320,7 +319,7 @@ const talentTemplate = [
     reviewList: [],
   },
   {
-    id: 't-cnt-1', author: 'testuser', skill: 'Content', role: 'Web3 Content Strategist',
+    id: 't-cnt-1', author: 'felix', skill: 'Content', role: 'Web3 Content Strategist',
     title: 'I will write and distribute your Web3 content strategy',
     bio: 'Content that drives adoption. I write threads, articles, and newsletters for crypto projects.',
     tags: ['Web3', 'Content', 'Growth'],
@@ -336,7 +335,7 @@ const talentTemplate = [
     reviewList: [],
   },
   {
-    id: 't-gov-1', author: 'testuser', skill: 'Governance', role: 'DAO Governance Lead',
+    id: 't-gov-1', author: 'amara', skill: 'Governance', role: 'DAO Governance Lead',
     title: 'I will set up and run your DAO governance system',
     bio: 'Governance design, proposal drafting, and community voting infrastructure.',
     tags: ['Community', 'Discord', 'Farcaster'],
@@ -366,7 +365,7 @@ const talentTemplate = [
     reviewList: [],
   },
   {
-    id: 't-mkt-1', author: 'testuser', skill: 'Marketing', role: 'Web3 Growth Marketer',
+    id: 't-mkt-1', author: 'zara', skill: 'Marketing', role: 'Web3 Growth Marketer',
     title: 'I will grow your Web3 project community and reach',
     bio: 'Growth marketing for crypto — community building, partnerships, and user acquisition.',
     tags: ['Growth', 'Campaigns', 'SEO'],
@@ -398,7 +397,7 @@ const talentTemplate = [
 ];
 
 const talentService = {
-  _key: TALENT_KEY,
+  _key: TALENT_KEY_APPROVED,
 
   async init() {
     try {
@@ -529,7 +528,7 @@ const SECTORS = [];
 const MEMBERS = [];
 
 // ===== Conferences / Classes (admin + moderator hosted) =====
-const CAN_HOST_TIERS = ['Official', 'Captain'];
+const CAN_HOST_TIERS = ['Compass Legend', 'Trailblazer'];
 const CAN_CREATE_ROLES = ['admin', 'mod'];
 const canCreateEvent = (user) => user && (CAN_CREATE_ROLES.includes(user.role) || CAN_HOST_TIERS.includes(user.tier));
 const genConfId = () => 'cls_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
@@ -828,8 +827,10 @@ const questService = {
       }
     }
 
-    const user = USERS.find(u => u.handle === 'testuser');
-    if (user) user.kp = (user.kp || 0) + q.kp;
+    if (window.currentUser && window.currentUser.handle) {
+      const user = USERS.find(u => u.handle === window.currentUser.handle);
+      if (user) user.kp = (user.kp || 0) + q.kp;
+    }
 
     try {
       localStorage.setItem(this._key, JSON.stringify({ date: new Date().toDateString(), list: QUESTS }));
@@ -973,7 +974,7 @@ const spaceService = {
   },
 
   async toggleReminder(id, on, userHandle) {
-    const handle = userHandle || 'testuser';
+    const handle = userHandle || '';
     const sb = this._sb();
     if (sb) {
       const space = await this.get(id);

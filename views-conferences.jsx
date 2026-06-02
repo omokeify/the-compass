@@ -112,7 +112,7 @@ const StudioPage = ({ navigate, currentUser, registered, onRegister, onJoin, onS
         <div className="studio-locked">
           <span className="sl-icon"><Icon name="lock" size={26} /></span>
           <h1>Studio is for moderators & admins.</h1>
-          <p>Hosting live classes is limited to Captain-tier and official accounts. Earn KP and get promoted, or ping a moderator.</p>
+          <p>Hosting live classes is limited to Trailblazer-tier and Compass Legend accounts. Earn KP and get promoted, or ping a moderator.</p>
           <button className="btn primary" onClick={() => navigate({ view: 'events' })}>Browse upcoming classes</button>
         </div>
       </div>

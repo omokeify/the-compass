@@ -8,7 +8,7 @@ const MessagesPage = ({ navigate, currentUser }) => {
   const [msgs, setMsgs] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
 
-  const me = currentUser?.handle || 'testuser';
+  const me = currentUser?.handle || '';
 
   const active = convos.find(c => c.id === activeId);
 
@@ -169,7 +169,7 @@ const MessageThread = ({ convo, msgs, draft, setDraft, onSend, onBack, otherUser
         {loading && <div className="empty" style={{ padding: 16 }}>Loading...</div>}
         {!loading && msgs.length === 0 && <div className="empty" style={{ padding: 16 }}>No messages yet.</div>}
         {msgs.map((m, i) => {
-          const mine = m.sender_handle === 'testuser';
+          const mine = m.sender_handle === me;
           const prev = msgs[i - 1];
           const showHeader = !prev || prev.sender_handle !== m.sender_handle;
           return (

@@ -16,7 +16,7 @@ function mapSbProfile(user, profile) {
     hue: profile?.hue || 215,
     bio: profile?.bio || '',
     loc: profile?.loc || '',
-    tier: profile?.tier || 'Cadet',
+    tier: profile?.tier || 'Explorer',
     kp: profile?.kp || 0,
     role: profile?.role || null,
   };
@@ -25,7 +25,7 @@ function mapSbProfile(user, profile) {
 function App() {
   const [route, setRoute] = React.useState(() => routeFromPath());
   const [loggedIn, setLoggedIn] = React.useState(false);
-  const [currentUser, setCurrentUser] = React.useState(userByHandle('testuser'));
+  const [currentUser, setCurrentUser] = React.useState(null);
   const [authLoading, setAuthLoading] = React.useState(true);
   const [composer, setComposer] = React.useState(null);
   const [signup, setSignup] = React.useState(false);
@@ -41,11 +41,12 @@ function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [refreshTick, setRefreshTick] = React.useState(0);
 
-  // Check for existing Supabase session on mount
+  // Check for existing Supabase session or OAuth callback on mount
   React.useEffect(() => {
     (async () => {
       try {
-        const session = supabaseService.getSession();
+        const callbackSession = supabaseService.handleAuthCallback();
+        const session = callbackSession || supabaseService.getSession();
         if (session?.access_token) {
           const user = await supabaseService.getUser();
           if (user) {
@@ -67,6 +68,7 @@ function App() {
     clearTimeout(window.__toastT);
     window.__toastT = setTimeout(() => setToast(null), 3200);
   };
+  window.showToast = showToast;
 
   const signIn = async ({ email, password, onboardNext = false } = {}) => {
     if (email && password) {
@@ -100,7 +102,7 @@ function App() {
   const signOut = async () => {
     try { await supabaseService.signOut(); } catch {}
     setLoggedIn(false);
-    setCurrentUser(userByHandle('testuser'));
+    setCurrentUser(null);
     setComposer(null);
     setNotifs(false);
     setPalette(false);

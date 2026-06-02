@@ -1,6 +1,6 @@
 export const categories = [
-  { id: 'news', code: '01', name: 'News Highlights', slug: 'news-highlights', desc: 'Curated Web3 updates, ecosystem movements, and high-signal alpha.', hue: 215, icon: 'news', posts: 1284, moderators: ['testuser'] },
-  { id: 'alpha', code: '02', name: 'Alpha Corner', slug: 'alpha-corner', desc: 'Early-stage, high-potential opportunities. Validated by contributors.', hue: 50, icon: 'alpha', posts: 743, moderators: ['testuser'], premium: true },
+  { id: 'news', code: '01', name: 'News Highlights', slug: 'news-highlights', desc: 'Curated Web3 updates, ecosystem movements, and high-signal alpha.', hue: 215, icon: 'news', posts: 1284, moderators: [] },
+  { id: 'alpha', code: '02', name: 'Alpha Corner', slug: 'alpha-corner', desc: 'Early-stage, high-potential opportunities. Validated by contributors.', hue: 50, icon: 'alpha', posts: 743, moderators: [], premium: true },
   { id: 'earn', code: '03', name: 'Earning Opportunities', slug: 'earning', desc: 'Bounties, jobs, airdrops, quests. Make money in Web3.', hue: 145, icon: 'earn', posts: 2105 },
   { id: 'skills', code: '04', name: 'Skill Marketplace', slug: 'skills', desc: 'Talent infrastructure connecting builders to Web3 projects.', hue: 290, icon: 'skills', posts: 612 },
   { id: 'activities', code: '05', name: 'Activities', slug: 'activities', desc: 'Blog ecosystem, ecosystems of the month, Voice of Impact.', hue: 340, icon: 'activities', posts: 487 },
@@ -10,11 +10,10 @@ export const categories = [
 ];
 
 export const users = [
-  { handle: 'testuser', name: 'Test User', tier: 'Cadet', kp: 0, joined: '2024-01-01', bio: 'Building in Web3.', loc: 'Accra, GH', avatar: 'T', hue: 215 },
 ];
 
 export function userByHandle(handle) {
-  return users.find((user) => user.handle === handle) || users[0];
+  return users.find((user) => user.handle === handle) || null;
 }
 
 export const tags = [

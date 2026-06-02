@@ -50,7 +50,7 @@ export function routeToPath(route = DEFAULT_ROUTE) {
   if (route.view === 'article') return `/articles/${enc(route.id)}`;
   if (route.view === 'profile') {
     const tab = route.tab ? `/${enc(route.tab)}` : '';
-    return `/profile/${enc(route.handle || 'testuser')}${tab}`;
+    return `/profile/${enc(route.handle || '')}${tab}`;
   }
 
   return '/';

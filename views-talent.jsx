@@ -265,6 +265,7 @@ const TalentPage = ({ navigate, currentUser }) => {
   const [approvedTalents, setApprovedTalents] = React.useState([]);
   const [showApply, setShowApply] = React.useState(false);
   const [applied, setApplied] = React.useState(false);
+  const [showGigEditor, setShowGigEditor] = React.useState(false);
 
   React.useEffect(() => {
     talentService.list(currentUser).then(setTalentList);
@@ -283,6 +284,14 @@ const TalentPage = ({ navigate, currentUser }) => {
       setApplied(true);
       setShowApply(false);
     } catch {}
+  };
+
+  const handleCreateGig = () => setShowGigEditor(true);
+
+  const handleSaveGig = async (id, data) => {
+    await talentService.create({ ...data, id, skill: 'Development', author: currentUser.handle }, currentUser);
+    setTalentList(await talentService.list(currentUser));
+    setShowGigEditor(false);
   };
 
   let list = skill === 'All' ? [...talentList] : talentList.filter(t => t.skill === skill);
@@ -307,7 +316,7 @@ const TalentPage = ({ navigate, currentUser }) => {
             </button>
           )}
           {currentUser && canPost && (
-            <button className="btn primary">
+            <button className="btn primary" onClick={handleCreateGig}>
               <Icon name="plus" size={12} /> Post a gig
             </button>
           )}
@@ -391,6 +400,10 @@ const TalentPage = ({ navigate, currentUser }) => {
           <TalentProfileCard key={t.id} t={t} navigate={navigate} />
         ))}
       </div>
+
+      {showGigEditor && (
+        <GigEditorModal gig={{ title: '', bio: '', description: '', price: 0, tags: [] }} onSave={handleSaveGig} onClose={() => setShowGigEditor(false)} />
+      )}
     </div>
   );
 };

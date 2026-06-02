@@ -51,7 +51,7 @@ function routeToPath(route = DEFAULT_ROUTE) {
   if (route.view === 'article') return `/articles/${enc(route.id)}`;
   if (route.view === 'profile') {
     const tab = route.tab ? `/${enc(route.tab)}` : '';
-    const fallbackHandle = route.handle || (window.currentUser && window.currentUser.handle) || 'testuser';
+    const fallbackHandle = route.handle || (window.currentUser && window.currentUser.handle) || '';
     return `/profile/${enc(fallbackHandle)}${tab}`;
   }
 

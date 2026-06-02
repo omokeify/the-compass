@@ -18,9 +18,9 @@ const AuthPage = ({ initialMode = 'signin', onSignedIn, onSignedUp }) => {
     if (!valid || busy) return;
     setBusy(true);
     if (isSignup) {
-      onSignedUp({ email, password, name, handle });
+      onSignedUp({ email, password: pw, name, handle });
     } else {
-      onSignedIn({ email, password });
+      onSignedIn({ email, password: pw });
     }
   };
 
@@ -38,8 +38,8 @@ const AuthPage = ({ initialMode = 'signin', onSignedIn, onSignedUp }) => {
           </div>
 
           <div className="auth-pitch">
-            <h1>Find your north in Web3.</h1>
-            <p>Curated alpha, validated bounties, talent and live classes — the community where African builders trade signal.</p>
+            <h1>Your voice. Your people. Your community.</h1>
+            <p>Curated alpha, validated bounties, talent and live classes — a community of opportunities for all builders.</p>
           </div>
         </div>
       </aside>
@@ -62,21 +62,27 @@ const AuthPage = ({ initialMode = 'signin', onSignedIn, onSignedUp }) => {
           <p className="auth-subh">{isSignup ? 'Free forever — no wallet or card required.' : 'Sign in to pick up where you left off.'}</p>
 
           <div className="auth-oauth">
-            <button className="auth-oauth-btn" onClick={onSignedIn}>
+            <button className="auth-oauth-btn" onClick={() => supabaseService.signInWithOAuth('google')}>
               <span className="aob-ic" style={{ background: '#fff' }}>
                 <svg width="15" height="15" viewBox="0 0 24 24"><path d="M12 11v3h5.3c-.2 1.4-1.6 4-5.3 4-3.2 0-5.8-2.6-5.8-5.8S8.8 6.4 12 6.4c1.8 0 3 .8 3.7 1.4l2.5-2.5C16.5 4 14.4 3 12 3 7 3 3 7 3 12s4 9 9 9c5.2 0 8.7-3.7 8.7-8.8 0-.6-.1-1-.2-1.5H12z" fill="#4285F4"/></svg>
               </span>
               Google
             </button>
-            <button className="auth-oauth-btn" onClick={onSignedIn}>
+            <button className="auth-oauth-btn" onClick={() => supabaseService.signInWithOAuth('twitter')}>
+              <span className="aob-ic" style={{ background: '#0b0b0b' }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="#fff"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+              </span>
+              X
+            </button>
+            <button className="auth-oauth-btn" onClick={() => supabaseService.signInWithOAuth('apple')}>
               <span className="aob-ic" style={{ background: '#0b0b0b' }}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="#fff"><path d="M16.4 12.8c0-2.4 2-3.6 2.1-3.6-1.1-1.6-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.6.9-.8 0-1.9-.9-3.2-.9-1.6.1-3.2 1-4 2.6-1.7 2.9-.5 7.3 1.2 9.7.8 1.2 1.7 2.5 3 2.4 1.2-.1 1.7-.8 3.1-.8s1.9.8 3.1.7c1.3 0 2.1-1.2 2.9-2.3.9-1.4 1.3-2.6 1.3-2.7 0 0-2.4-1-2.4-3.1zM14 7c.7-.8 1.1-2 1-3.1-.9 0-2.1.6-2.7 1.4-.6.7-1.2 1.9-1 3 1 0 2-.5 2.7-1.3z"/></svg>
               </span>
               Apple
             </button>
-            <button className="auth-oauth-btn wallet" onClick={onSignedIn}>
+            <button className="auth-oauth-btn wallet" onClick={() => alert('Wallet sign-in coming soon.')}>
               <span className="aob-ic" style={{ background: 'var(--brand-yellow)' }}><Icon name="wallet" size={14} /></span>
-              Wallet
+              Wallet <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 4 }}>soon</span>
             </button>
           </div>
 

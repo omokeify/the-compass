@@ -122,24 +122,22 @@ const FeedPoll = ({ poll }) => {
   );
 };
 
-const InlineFeedComposer = ({ onCompose }) => {
-  const [draft, setDraft] = React.useState(() => ({
-    type: 'Signal',
-    body: '',
-    ...readFeedDraft(),
-  }));
+const InlineFeedComposer = ({ onCompose, currentUser }) => {
+  const [draft, setDraft] = React.useState('');
+  const [postType, setPostType] = React.useState('Signal');
 
-  React.useEffect(() => writeFeedDraft(draft), [draft]);
+  React.useEffect(() => {
+    try { const saved = localStorage.getItem('compass_feed_draft_v1'); if (saved) setDraft(saved); } catch {}
+  }, []);
 
-  const clearDraft = (e) => {
-    e.stopPropagation();
-    setDraft({ type: draft.type, body: '' });
-  };
+  React.useEffect(() => {
+    try { localStorage.setItem('compass_feed_draft_v1', draft); } catch {}
+  }, [draft]);
 
   return (
     <div className="feed-inline-composer">
       <div className="fic-top">
-        <Avatar user={userByHandle('testuser')} size={38} />
+        <Avatar user={currentUser} size={38} />
         <div className="fic-body">
           <div className="fic-types">
             {Object.entries(FEED_TYPE_META).map(([type, meta]) => (
@@ -180,9 +178,9 @@ const InlineFeedComposer = ({ onCompose }) => {
 const readFollowingList = () => {
   try {
     const list = localStorage.getItem('compass_following_v1');
-    return list ? JSON.parse(list) : ['testuser'];
+    return list ? JSON.parse(list) : [];
   } catch {
-    return ['testuser'];
+    return [];
   }
 };
 
@@ -229,7 +227,7 @@ const timeAgo = (date) => {
   return `${d}d`;
 };
 
-const FeedCard = ({ item, navigate }) => {
+const FeedCard = ({ item, navigate, currentUser }) => {
   const author = item._supabase
     ? { handle: item.author_handle, name: item.author_name, avatar: item.author_avatar, hue: item.author_hue, tier: item.author_tier }
     : userByHandle(item.author);
@@ -272,11 +270,14 @@ const FeedCard = ({ item, navigate }) => {
 
   const submitComment = () => {
     if (!draft.trim()) return;
-    setComments(c => [...c, { author: 'testuser', when: 'just now', body: draft.trim(), likes: 0 }]);
+    const handle = currentUser?.handle || 'user';
+    setComments(c => [...c, { author: handle, when: 'just now', body: draft.trim(), likes: 0 }]);
+    const body = draft.trim();
     setDraft('');
-    // Persist to Supabase if available
     if (item._supabase && window.supabaseService) {
-      supabaseService.addComment({ postId: item.id, body: draft.trim() }).catch(() => {});
+      window.supabaseService.addComment({ postId: item.id, body }).catch(() => {
+        if (window.showToast) window.showToast('Failed to post comment');
+      });
     }
   };
 
@@ -284,7 +285,8 @@ const FeedCard = ({ item, navigate }) => {
     const next = !liked;
     setLiked(next);
     if (item._supabase && window.supabaseService) {
-      try { await supabaseService.toggleReaction({ postId: item.id, type: 'like' }); } catch {}
+      try { await window.supabaseService.toggleReaction({ postId: item.id, type: 'like' }); }
+      catch { setLiked(!next); if (window.showToast) window.showToast('Failed to like'); }
     }
   };
 
@@ -292,7 +294,8 @@ const FeedCard = ({ item, navigate }) => {
     const next = !reposted;
     setReposted(next);
     if (item._supabase && window.supabaseService) {
-      try { await supabaseService.toggleReaction({ postId: item.id, type: 'repost' }); } catch {}
+      try { await window.supabaseService.toggleReaction({ postId: item.id, type: 'repost' }); }
+      catch { setReposted(!next); if (window.showToast) window.showToast('Failed to repost'); }
     }
   };
 
@@ -329,7 +332,6 @@ const FeedCard = ({ item, navigate }) => {
           </div>
         </div>
         <div className="feed-more">
-          {author.handle !== 'testuser' && (
             <button
               className={`btn ${isFollowing ? 'ghost' : 'solid'} sm follow-btn`}
               onClick={async (e) => {
@@ -345,7 +347,6 @@ const FeedCard = ({ item, navigate }) => {
             >
               {isFollowing ? 'Following' : 'Follow'}
             </button>
-          )}
           <button className={`btn ghost icon-only ${shared ? 'active' : ''}`} title={shared ? 'Copied' : 'Share'} onClick={() => setShared(true)}>
             <Icon name="reply" size={14} />
           </button>
@@ -435,7 +436,7 @@ const FeedCard = ({ item, navigate }) => {
             </ul>
           )}
           <div className="fc-composer">
-            <Avatar user={userByHandle('testuser')} size={28} />
+            <Avatar user={currentUser} size={28} />
             <input
               className="fc-input"
               placeholder="Write a comment…"
@@ -576,11 +577,11 @@ const FeedView = ({ navigate, onCompose, currentUser }) => {
             ))}
           </div>
 
-          <InlineFeedComposer onCompose={onCompose} />
+          <InlineFeedComposer onCompose={onCompose} currentUser={currentUser} />
 
           {/* Quick composer */}
           <div className="feed-composer feed-composer-legacy" onClick={onCompose}>
-            <Avatar user={userByHandle('testuser')} size={36} />
+            <Avatar user={currentUser} size={36} />
             <span className="fc-prompt">Share a signal, an alpha, or a question…</span>
             <span className="fc-tools">
               <Icon name="image" size={14} />
@@ -620,7 +621,7 @@ const FeedView = ({ navigate, onCompose, currentUser }) => {
             ) : list.length === 0 ? (
               <div className="empty">Nothing here yet — change the filter or start the conversation.</div>
             ) : (
-              list.map(item => <FeedCard key={item.id} item={item} navigate={navigate} />)
+              list.map(item => <FeedCard key={item.id} item={item} navigate={navigate} currentUser={currentUser} />)
             )}
           </div>
         </div>
@@ -675,17 +676,15 @@ const FeedView = ({ navigate, onCompose, currentUser }) => {
                         <div className="ru-handle">@{u.handle}</div>
                       </div>
                     </div>
-                    {u.handle !== 'testuser' && (
-                      <button 
-                        className={`btn ${isFollowingThisUser ? 'ghost' : 'solid'} sm`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFollow(u.handle);
-                        }}
-                      >
-                        {isFollowingThisUser ? 'Following' : 'Follow'}
-                      </button>
-                    )}
+                    <button 
+                      className={`btn ${isFollowingThisUser ? 'ghost' : 'solid'} sm`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFollow(u.handle);
+                      }}
+                    >
+                      {isFollowingThisUser ? 'Following' : 'Follow'}
+                    </button>
                   </li>
                 );
               })}

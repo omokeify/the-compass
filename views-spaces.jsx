@@ -165,7 +165,7 @@ const RemindBtn = ({ space, currentUser }) => {
       const next = !reminded;
       if (next) set.add(space.id); else set.delete(space.id);
       localStorage.setItem('compass_space_reminders_v1', JSON.stringify([...set]));
-      await spaceService.toggleReminder(space.id, next, currentUser?.handle || 'testuser');
+      await spaceService.toggleReminder(space.id, next, currentUser?.handle || '');
       setReminded(next);
     } catch {}
   };
@@ -185,7 +185,7 @@ const CreateSpaceModal = ({ currentUser, onClose, onCreated }) => {
   const [date, setDate] = React.useState('');
   const [time, setTime] = React.useState('');
 
-  const currentUser = userByHandle('testuser');
+
 
   const handleCreate = async () => {
     if (mode === 'schedule' && (!title.trim() || !date || !time)) return;

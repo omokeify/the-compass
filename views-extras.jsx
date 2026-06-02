@@ -93,8 +93,8 @@ const SavedPage = ({ navigate, embedded }) => {
 };
 
 // ============================ WALLET ============================
-const WalletPage = ({ navigate, embedded }) => {
-  const w = WALLET;
+const WalletPage = ({ navigate, embedded, currentUser }) => {
+   const w = WALLET;
   const inner = (
     <>
       <div className="wallet-cards">
@@ -112,7 +112,7 @@ const WalletPage = ({ navigate, embedded }) => {
         <div className="wallet-stats">
           <div className="ws-cell"><div className="ws-l">In escrow</div><div className="ws-n">${w.pendingEscrow.toLocaleString()}</div><div className="ws-sub">1 active order</div></div>
           <div className="ws-cell"><div className="ws-l">Earned this month</div><div className="ws-n">${w.thisMonth.toLocaleString()}</div><div className="ws-sub up">▲ 38% vs last</div></div>
-          <div className="ws-cell"><div className="ws-l">Knowledge Points</div><div className="ws-n">{w.kp.toLocaleString()}</div><div className="ws-sub">Captain tier</div></div>
+          <div className="ws-cell"><div className="ws-l">Knowledge Points</div><div className="ws-n">{w.kp.toLocaleString()}</div><div className="ws-sub">{currentUser ? getLevelName(getUserLevel(currentUser)) + ' rank' : '-'}</div></div>
         </div>
       </div>
 

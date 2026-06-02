@@ -26,9 +26,46 @@ function authHeaders() {
     'Content-Type': 'application/json',
   };
   if (session?.access_token) {
+    if (isTokenExpired(session.access_token)) {
+      ensureValidToken();
+    }
     headers['Authorization'] = `Bearer ${session.access_token}`;
   }
   return headers;
+}
+
+function decodeToken(token) {
+  try { return JSON.parse(atob(token.split('.')[1])); } catch { return null; }
+}
+
+function isTokenExpired(token) {
+  const payload = decodeToken(token);
+  if (!payload?.exp) return true;
+  return Date.now() >= payload.exp * 1000;
+}
+
+let _refreshInProgress = null;
+
+async function ensureValidToken() {
+  const session = getSession();
+  if (!session?.access_token || !session?.refresh_token) return false;
+  if (!isTokenExpired(session.access_token)) return true;
+  if (_refreshInProgress) return _refreshInProgress;
+  _refreshInProgress = (async () => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: session.refresh_token }),
+      });
+      if (!res.ok) { clearSession(); return false; }
+      const newSession = await res.json();
+      setSession(newSession);
+      return true;
+    } catch { clearSession(); return false; }
+    finally { _refreshInProgress = null; }
+  })();
+  return _refreshInProgress;
 }
 
 const supabaseService = {
@@ -89,6 +126,30 @@ const supabaseService = {
   },
 
   getSession,
+
+  signInWithOAuth(provider) {
+    const redirectTo = encodeURIComponent(window.location.origin + '/auth/callback');
+    window.location.href = `${SUPABASE_URL}/auth/v1/authorize?provider=${provider}&redirect_to=${redirectTo}`;
+  },
+
+  handleAuthCallback() {
+    const hash = window.location.hash;
+    if (!hash || !hash.includes('access_token')) return null;
+    const params = new URLSearchParams(hash.replace('#', ''));
+    const session = {
+      access_token: params.get('access_token'),
+      refresh_token: params.get('refresh_token'),
+      expires_in: params.get('expires_in'),
+      provider_token: params.get('provider_token'),
+      user: null,
+    };
+    if (session.access_token) {
+      setSession(session);
+      window.location.hash = '';
+      return session;
+    }
+    return null;
+  },
 
   // ===== Profile =====
   async getProfile(userId) {
