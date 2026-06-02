@@ -415,6 +415,129 @@ const supabaseService = {
     });
     return res.ok;
   },
+
+  // ===== Realtime subscriptions (WebSocket) =====
+  _realtimeChannels: new Map(),
+
+  subscribeRealtime({ type, eventName, onInsert, onUpdate, onDelete }) {
+    const key = `${type}_${eventName || 'all'}`;
+    if (this._realtimeChannels.has(key)) return this._realtimeChannels.get(key);
+
+    let ws;
+    let timer;
+    let active = true;
+    const session = getSession();
+    const token = session?.access_token;
+    if (!token) return null;
+
+    try {
+      ws = new WebSocket(`${SUPABASE_URL.replace('https://', 'wss://')}/realtime/v1/websocket?apikey=${SUPABASE_ANON_KEY}&Authorization=Bearer+${encodeURIComponent(token)}`);
+    } catch {
+      return null;
+    }
+
+    const unsub = () => {
+      active = false;
+      clearTimeout(timer);
+      try { ws.close(); } catch {}
+      this._realtimeChannels.delete(key);
+    };
+
+    const callbacks = {};
+
+    ws.onopen = () => {
+      const topic = `realtime:${type}`;
+      ws.send(JSON.stringify({
+        topic,
+        event: 'phx_join',
+        payload: {},
+        ref: '1',
+      }));
+
+      timer = setInterval(() => {
+        if (!active) return;
+        try {
+          ws.send(JSON.stringify({ topic, event: 'heartbeat', payload: {}, ref: String(Date.now()) }));
+        } catch {}
+      }, 25000);
+    };
+
+    ws.onmessage = (msg) => {
+      try {
+        const data = JSON.parse(msg.data);
+        const payload = data.payload || {};
+        const row = payload.record || payload.new || payload.old;
+        if (!row) return;
+
+        const event = (data.event || '').toLowerCase();
+        if (event === 'insert' && onInsert) onInsert(row);
+        else if (event === 'update' && onUpdate) onUpdate(row);
+        else if (event === 'delete' && onDelete) onDelete(row);
+      } catch {}
+    };
+
+    const channel = { unsub, on: (opts) => { return channel; } };
+    this._realtimeChannels.set(key, channel);
+    return channel;
+  },
+
+  // ===== Messaging / DMs =====
+  async listConversations() {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/conversations?order=last_when.desc`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async getConversation(id) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/conversations?id=eq.${id}&select=*`, { headers: authHeaders() });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.[0] || null;
+  },
+
+  async createConversation({ participants }) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/conversations`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ id: 'convo_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), participants: participants || [] }),
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Failed to create conversation'); }
+    return res.json();
+  },
+
+  async listMessages({ conversationId }) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/messages?conversation_id=eq.${encodeURIComponent(conversationId)}&order=created_at.asc`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async sendMessage({ conversationId, body }) {
+    const session = getSession();
+    if (!session?.user?.id) throw new Error('Not authenticated');
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/messages`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        id: 'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+        conversation_id: conversationId,
+        sender_id: session.user.id,
+        sender_handle: session.user.user_metadata?.handle || session.user.email || 'user',
+        body,
+      }),
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Failed to send message'); }
+    await this.updateConversationLastMessage(conversationId, body);
+    return res.json();
+  },
+
+  async updateConversationLastMessage(conversationId, text) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ last_message: text, last_when: new Date().toISOString() }),
+    });
+    return res.ok;
+  },
 };
 
 Object.assign(window, { supabaseService });

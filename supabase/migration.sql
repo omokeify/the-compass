@@ -293,3 +293,77 @@ DROP POLICY IF EXISTS "Hosts can delete own spaces" ON public.spaces;
 CREATE POLICY "Hosts can delete own spaces"
   ON public.spaces FOR DELETE
   USING (auth.role() = 'authenticated' AND host = auth.uid()::TEXT);
+
+-- 11. Conversations / DMs
+CREATE TABLE IF NOT EXISTS public.conversations (
+  id TEXT PRIMARY KEY,
+  participants JSONB NOT NULL DEFAULT '[]'::jsonb,
+  last_message TEXT DEFAULT '',
+  last_when TIMESTAMPTZ DEFAULT now(),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION public.conversation_participant_ids()
+RETURNS SETOF UUID AS $$
+  SELECT jsonb_array_elements_text(participants)::UUID;
+$$ LANGUAGE sql STABLE;
+
+DROP POLICY IF EXISTS "Participants can view conversations" ON public.conversations;
+CREATE POLICY "Participants can view conversations"
+  ON public.conversations FOR SELECT
+  USING (auth.uid()::TEXT = ANY (SELECT jsonb_array_elements_text(participants)));
+
+DROP POLICY IF EXISTS "Authenticated users can create conversations" ON public.conversations;
+CREATE POLICY "Authenticated users can create conversations"
+  ON public.conversations FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Participants can update conversations" ON public.conversations;
+CREATE POLICY "Participants can update conversations"
+  ON public.conversations FOR UPDATE
+  USING (auth.uid()::TEXT = ANY (SELECT jsonb_array_elements_text(participants)));
+
+DROP POLICY IF EXISTS "Participants can delete conversations" ON public.conversations;
+CREATE POLICY "Participants can delete conversations"
+  ON public.conversations FOR DELETE
+  USING (auth.uid()::TEXT = ANY (SELECT jsonb_array_elements_text(participants)));
+
+-- 12. Messages
+CREATE TABLE IF NOT EXISTS public.messages (
+  id TEXT PRIMARY KEY,
+  conversation_id TEXT NOT NULL REFERENCES public.conversations(id) ON DELETE CASCADE,
+  sender_id UUID NOT NULL,
+  sender_handle TEXT NOT NULL,
+  body TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Participants can view messages" ON public.messages;
+CREATE POLICY "Participants can view messages"
+  ON public.messages FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.conversations c
+      WHERE c.id = messages.conversation_id
+        AND auth.uid()::TEXT = ANY (SELECT jsonb_array_elements_text(c.participants))
+    )
+  );
+
+DROP POLICY IF EXISTS "Authenticated senders can insert messages" ON public.messages;
+CREATE POLICY "Authenticated senders can insert messages"
+  ON public.messages FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated' AND sender_id = auth.uid());
+
+DROP POLICY IF EXISTS "Senders can update own messages" ON public.messages;
+CREATE POLICY "Senders can update own messages"
+  ON public.messages FOR UPDATE
+  USING (sender_id = auth.uid());
+
+DROP POLICY IF EXISTS "Senders can delete own messages" ON public.messages;
+CREATE POLICY "Senders can delete own messages"
+  ON public.messages FOR DELETE
+  USING (sender_id = auth.uid());

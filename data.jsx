@@ -184,8 +184,75 @@ const NOTIFICATIONS = [];
 // ===== Conversations (DMs) =====
 const CONVERSATIONS = [];
 
+const MESSAGES_KEY = 'compass_messages_v1';
+const MESSAGES_BY_CONVO = {};
+
+function loadMessages() {
+  try {
+    const raw = localStorage.getItem(MESSAGES_KEY);
+    if (raw) Object.assign(MESSAGES_BY_CONVO, JSON.parse(raw));
+  } catch {}
+}
+function persistMessages() {
+  try { localStorage.setItem(MESSAGES_KEY, JSON.stringify(MESSAGES_BY_CONVO)); } catch {}
+}
+loadMessages();
+
+function messagesFor(id) {
+  if (!MESSAGES_BY_CONVO[id]) MESSAGES_BY_CONVO[id] = [];
+  return MESSAGES_BY_CONVO[id];
+}
+
+const messageService = {
+  _sb() { return window.supabaseService?.getSession()?.access_token ? window.supabaseService : null; },
+
+  async listConversations() {
+    const sb = this._sb();
+    if (sb) {
+      const rows = await sb.listConversations();
+      return (rows || []).map(c => ({...c, participants: Array.isArray(c.participants) ? c.participants : (typeof c.participants === 'string' ? JSON.parse(c.participants) : [])}));
+    }
+    return CONVERSATIONS.map(c => ({...c}));
+  },
+
+  async getMessages(conversationId) {
+    const sb = this._sb();
+    if (sb) return sb.listMessages({ conversationId });
+    return messagesFor(conversationId).map(m => ({...m}));
+  },
+
+  async getConversation(conversationId) {
+    const sb = this._sb();
+    if (sb) return sb.getConversation(conversationId);
+    return CONVERSATIONS.find(c => c.id === conversationId) || null;
+  },
+
+  async sendMessage({ conversationId, body }) {
+    const sb = this._sb();
+    const text = (body || '').trim();
+    if (!text) return null;
+    if (sb) return sb.sendMessage({ conversationId, body: text });
+    const msg = { id: 'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), from: 'testuser', body: text, when: 'just now' };
+    const msgs = messagesFor(conversationId);
+    msgs.push(msg);
+    persistMessages();
+    const convo = CONVERSATIONS.find(c => c.id === conversationId);
+    if (convo) { convo.last = text; convo.lastWhen = 'just now'; }
+    return msg;
+  },
+
+  async createConversation({ participantHandles }) {
+    const sb = this._sb();
+    const participants = Array.isArray(participantHandles) ? participantHandles : [];
+    if (sb) return sb.createConversation({ participants });
+    const id = 'convo_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    const convo = { id, participants, last: '', lastWhen: 'just now' };
+    CONVERSATIONS.push(convo);
+    return convo;
+  },
+};
+
 // ===== Talent Marketplace =====
-const TALENT_KEY = 'compass_talent_v1';
 const TALENT_KEY_APPROVED = 'compass_approved_talents_v1';
 const TALENT = [];
 const TALENT_SKILLS = [ 'All', 'Auditing', 'Engineering', 'Design', 'Content', 'Development', 'Governance', 'Video', 'Marketing', 'Research' ];
@@ -948,7 +1015,7 @@ Object.assign(window, {
   ONLINE_MEMBERS, CONTENT_ITEMS, NOTIFICATIONS, CONVERSATIONS, TALENT, TALENT_SKILLS,
   REGIONS, SECTORS, MEMBERS, CONFERENCES, CAN_HOST_TIERS, canCreateEvent, genConfId,
   QUESTS, BOUNTIES, WALLET, PRO_PLANS, PRO_PERKS,
-  SPACES, spaceService, conferenceService, questService, talentService,
+  SPACES, spaceService, conferenceService, messageService, questService, talentService,
   hasAttended, awardAttendance, getKpSummary, getAttendedClasses, KP_PER_CLASS,
   LEVEL_NAMES, LEVEL_THRESHOLDS, getLevelFromKp, getLevelName, getUserLevel,
   parseLockLevel, CATEGORY_ACCESS, getCategoryAccess, canViewCategory, canPostCategory, canReplyCategory,
