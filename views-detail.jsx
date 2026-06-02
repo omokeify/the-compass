@@ -1084,7 +1084,13 @@ const LeaderboardPage = ({ navigate }) => {
 // ---------- Events ----------
 const EventsPage = ({ navigate, currentUser, registered, onRegister, onJoin, onSchedule }) => {
   const [classes, setClasses] = React.useState([]);
-  React.useEffect(() => { conferenceService.list().then(setClasses); }, []);
+  const refresh = () => conferenceService.list().then(setClasses);
+  React.useEffect(() => { refresh(); }, []);
+  React.useEffect(() => {
+    const handler = () => refresh();
+    window.addEventListener('compass_conferences_refresh', handler);
+    return () => window.removeEventListener('compass_conferences_refresh', handler);
+  }, [refresh]);
 
   const canView = canViewCategory(currentUser, 'events');
   const liveClasses = classes.filter(c => c.status === 'live');

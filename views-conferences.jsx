@@ -88,6 +88,12 @@ const StudioPage = ({ navigate, currentUser, registered, onRegister, onJoin, onS
 
   const refresh = () => { conferenceService.list().then(setList); };
 
+  React.useEffect(() => {
+    const handler = () => refresh();
+    window.addEventListener('compass_conferences_refresh', handler);
+    return () => window.removeEventListener('compass_conferences_refresh', handler);
+  }, [refresh]);
+
   // Expose refresh so ScheduleClassModal can trigger it
   React.useEffect(() => { window.__studioRefresh = refresh; return () => { delete window.__studioRefresh; }; }, []);
 

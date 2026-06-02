@@ -492,21 +492,42 @@ const conferenceService = {
     try { localStorage.setItem(this._key, JSON.stringify(CONFERENCES)); } catch {}
   },
 
+  _normConference(raw) {
+    if (!raw) return null;
+    const c = { ...raw };
+    const jsonbFields = ['cohosts', 'stage', 'registrants', 'attendees', 'chat', 'board_strokes'];
+    for (const f of jsonbFields) {
+      const target = f === 'board_strokes' ? 'boardStrokes' : f;
+      if (typeof c[f] === 'string') {
+        try { c[target] = JSON.parse(c[f]); } catch { c[target] = []; }
+      } else if (!Array.isArray(c[target])) {
+        c[target] = [];
+      }
+    }
+    if (typeof c.description === 'string' && !c.desc) c.desc = c.description;
+    if (typeof c.when_text === 'string' && !c.when) c.when = c.when_text;
+    c.registered = Number(c.registered) || 0;
+    c.attended = Number(c.attended) || 0;
+    c.capacity = Number(c.capacity) || 150;
+    c.durationMin = Number(c.duration_min) || 60;
+    return c;
+  },
+
   async list() {
     const sb = this._sb();
-    if (sb) return sb.listConferences();
+    if (sb) return (sb.listConferences() || []).map(c => this._normConference(c));
     return [...CONFERENCES];
   },
 
   async get(id) {
     const sb = this._sb();
-    if (sb) return sb.getConference(id);
+    if (sb) return this._normConference(await sb.getConference(id));
     return CONFERENCES.find(c => c.id === id) || null;
   },
 
   async create(cls) {
     const sb = this._sb();
-    if (sb) return sb.createConference(cls);
+    if (sb) return this._normConference(await sb.createConference(cls));
     CONFERENCES.push(cls);
     this._persist();
     return cls;
@@ -514,7 +535,7 @@ const conferenceService = {
 
   async update(id, changes) {
     const sb = this._sb();
-    if (sb) { await sb.updateConference(id, changes); return changes; }
+    if (sb) { await sb.updateConference(id, changes); return this._normConference(await sb.getConference(id)); }
     const idx = CONFERENCES.findIndex(c => c.id === id);
     if (idx === -1) return null;
     Object.assign(CONFERENCES[idx], changes);
@@ -933,3 +954,29 @@ Object.assign(window, {
   parseLockLevel, CATEGORY_ACCESS, getCategoryAccess, canViewCategory, canPostCategory, canReplyCategory,
   canViewTopic, canReplyTopic, requiredLevelLabel,
 });
+
+const COMPASS_LIVE_TICK_MS = 3000;
+
+if (!window.__compass_poller_running) {
+  window.__compass_poller_running = true;
+  setInterval(async () => {
+    const session = window.supabaseService?.getSession()?.access_token;
+    if (!session) return;
+    try {
+      const [spaces, conferences] = await Promise.all([
+        spaceService.list(),
+        conferenceService.list(),
+      ]);
+      if (Array.isArray(spaces)) {
+        SPACES.length = 0;
+        SPACES.push(...spaces);
+        window.dispatchEvent(new Event('compass_spaces_refresh'));
+      }
+      if (Array.isArray(conferences)) {
+        CONFERENCES.length = 0;
+        CONFERENCES.push(...conferences);
+        window.dispatchEvent(new Event('compass_conferences_refresh'));
+      }
+    } catch {}
+  }, COMPASS_LIVE_TICK_MS);
+}

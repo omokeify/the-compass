@@ -11,6 +11,12 @@ const SpacesPage = ({ navigate, currentUser, onJoinSpace }) => {
 
   const refresh = () => spaceService.list().then(setList);
 
+  React.useEffect(() => {
+    const handler = () => refresh();
+    window.addEventListener('compass_spaces_refresh', handler);
+    return () => window.removeEventListener('compass_spaces_refresh', handler);
+  }, [refresh]);
+
   const tabs = [
     { id: 'all',       label: 'All' },
     { id: 'live',      label: 'Live',      filter: s => s.status === 'live' },
