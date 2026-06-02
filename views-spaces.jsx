@@ -2,7 +2,7 @@
 
 const genId = () => 'space_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 
-const SpacesPage = ({ navigate, onJoinSpace }) => {
+const SpacesPage = ({ navigate, currentUser, onJoinSpace }) => {
   const [tab, setTab] = React.useState('all');
   const [list, setList] = React.useState(() => [...SPACES]);
   const [showCreate, setShowCreate] = React.useState(false);
@@ -69,15 +69,15 @@ const SpacesPage = ({ navigate, onJoinSpace }) => {
       </div>
 
       <div className="spaces-grid">
-        {filtered.map(s => <SpaceCard key={s.id} space={s} onJoin={() => handleJoin(s)} navigate={navigate} />)}
+        {filtered.map(s => <SpaceCard key={s.id} space={s} currentUser={currentUser} onJoin={() => handleJoin(s)} navigate={navigate} />)}
       </div>
 
-      {showCreate && <CreateSpaceModal onClose={() => setShowCreate(false)} onCreated={handleCreated} />}
+      {showCreate && <CreateSpaceModal currentUser={currentUser} onClose={() => setShowCreate(false)} onCreated={handleCreated} />}
     </div>
   );
 };
 
-const SpaceCard = ({ space, onJoin, navigate }) => {
+const SpaceCard = ({ space, currentUser, onJoin, navigate }) => {
   const host = userByHandle(space.host);
   const cohosts = space.cohosts.map(userByHandle);
   const cat = CATEGORIES.find(c => c.id === space.topic);
@@ -124,7 +124,7 @@ const SpaceCard = ({ space, onJoin, navigate }) => {
               <Dot />
               <span>{space.reminders} interested</span>
             </div>
-            <RemindBtn space={space} />
+            <RemindBtn space={space} currentUser={currentUser} />
           </>
         )}
         {space.status === 'replay' && (
@@ -145,7 +145,7 @@ const SpaceCard = ({ space, onJoin, navigate }) => {
 };
 
 
-const RemindBtn = ({ space }) => {
+const RemindBtn = ({ space, currentUser }) => {
   const [reminded, setReminded] = React.useState(() => {
     try {
       const set = new Set(JSON.parse(localStorage.getItem('compass_space_reminders_v1') || '[]'));
@@ -159,7 +159,7 @@ const RemindBtn = ({ space }) => {
       const next = !reminded;
       if (next) set.add(space.id); else set.delete(space.id);
       localStorage.setItem('compass_space_reminders_v1', JSON.stringify([...set]));
-      await spaceService.toggleReminder(space.id, next);
+      await spaceService.toggleReminder(space.id, next, currentUser?.handle || 'testuser');
       setReminded(next);
     } catch {}
   };
@@ -172,7 +172,7 @@ const RemindBtn = ({ space }) => {
 };
 
 // ---------- Create / Schedule Space Modal ----------
-const CreateSpaceModal = ({ onClose, onCreated }) => {
+const CreateSpaceModal = ({ currentUser, onClose, onCreated }) => {
   const [title, setTitle] = React.useState('');
   const [topic, setTopic] = React.useState('activities');
   const [mode, setMode] = React.useState('now'); // 'now' | 'schedule'

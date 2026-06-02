@@ -365,13 +365,17 @@ const supabaseService = {
       body: JSON.stringify({
         id: space.id,
         title: space.title,
-        description: space.desc || '',
+        description: space.topic || space.desc || '',
         host: space.host,
-        cohosts: JSON.stringify(space.cohosts || []),
-        speakers: JSON.stringify(space.speakers || []),
-        listeners: space.listeners || 0,
+        cohosts: JSON.stringify(Array.isArray(space.cohosts) ? space.cohosts : []),
+        speakers: JSON.stringify(
+          typeof space.speakers === 'number'
+            ? Array.from({ length: space.speakers }, () => space.host)
+            : Array.isArray(space.speakers) ? space.speakers : []
+        ),
+        listeners: Number(space.listeners) || 0,
         status: space.status || 'live',
-        when_text: space.when || '',
+        when_text: space.scheduled || space.when || '',
         scheduled_iso: space.scheduledISO || null,
         cover: space.cover || 215,
       }),
@@ -383,11 +387,15 @@ const supabaseService = {
   async updateSpace(id, changes) {
     const body = {};
     if (changes.status !== undefined) body.status = changes.status;
-    if (changes.listeners !== undefined) body.listeners = changes.listeners;
+    if (changes.listeners !== undefined) body.listeners = Number(changes.listeners);
     if (changes.cohosts !== undefined) body.cohosts = JSON.stringify(changes.cohosts);
     if (changes.speakers !== undefined) body.speakers = JSON.stringify(changes.speakers);
     if (changes.title !== undefined) body.title = changes.title;
     if (changes.description !== undefined) body.description = changes.description;
+    if (changes.when_text !== undefined) body.when_text = changes.when_text;
+    if (changes.scheduled_iso !== undefined) body.scheduled_iso = changes.scheduled_iso;
+    if (changes.reminder_handles !== undefined) body.reminder_handles = JSON.stringify(changes.reminder_handles);
+    if (changes.reminders !== undefined) body.reminders = Number(changes.reminders);
     const res = await fetch(`${SUPABASE_URL}/rest/v1/spaces?id=eq.${id}`, {
       method: 'PATCH',
       headers: authHeaders(),

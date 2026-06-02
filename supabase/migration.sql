@@ -244,10 +244,15 @@ CREATE TABLE IF NOT EXISTS public.spaces (
   when_text TEXT DEFAULT '',
   scheduled_iso TIMESTAMPTZ,
   cover INTEGER DEFAULT 215,
+  reminder_handles JSONB DEFAULT '[]'::jsonb,
+  reminders INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
 ALTER TABLE public.spaces ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE public.spaces ADD COLUMN IF NOT EXISTS reminder_handles JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.spaces ADD COLUMN IF NOT EXISTS reminders INTEGER DEFAULT 0;
 
 DROP POLICY IF EXISTS "Spaces are public" ON public.spaces;
 CREATE POLICY "Spaces are public"
@@ -262,9 +267,9 @@ CREATE POLICY "Authenticated users can create spaces"
 DROP POLICY IF EXISTS "Hosts can update own spaces" ON public.spaces;
 CREATE POLICY "Hosts can update own spaces"
   ON public.spaces FOR UPDATE
-  USING (auth.role() = 'authenticated');
+  USING (auth.role() = 'authenticated' AND host = auth.uid()::TEXT);
 
 DROP POLICY IF EXISTS "Hosts can delete own spaces" ON public.spaces;
 CREATE POLICY "Hosts can delete own spaces"
   ON public.spaces FOR DELETE
-  USING (auth.role() = 'authenticated');
+  USING (auth.role() = 'authenticated' AND host = auth.uid()::TEXT);

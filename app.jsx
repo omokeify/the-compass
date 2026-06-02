@@ -172,7 +172,7 @@ function App() {
   else if (route.view === 'feed') main = <FeedView navigate={navigate} onCompose={() => setComposer({})} currentUser={currentUser} />;
   else if (route.view === 'talent') main = <TalentPage navigate={navigate} currentUser={currentUser} />;
   else if (route.view === 'gig') main = <GigDetailPage id={route.id} navigate={navigate} />;
-  else if (route.view === 'spaces') main = <SpacesPage navigate={navigate} onJoinSpace={(s) => setActiveSpace(s)} />;
+  else if (route.view === 'spaces') main = <SpacesPage navigate={navigate} currentUser={currentUser} onJoinSpace={(s) => setActiveSpace(s)} />;
   else if (route.view === 'members') main = <MembersPage navigate={navigate} onOpenCard={(h) => setMemberCard(h)} />;
   else if (route.view === 'studio') main = <StudioPage navigate={navigate} currentUser={currentUser} registered={registered} onRegister={registerClass} onJoin={(c) => setActiveClass(c)} onSchedule={() => setScheduleClass(true)} />;
   else if (route.view === 'messages') main = <MessagesPage navigate={navigate} currentUser={currentUser} />;

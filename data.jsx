@@ -778,21 +778,41 @@ const spaceService = {
     try { localStorage.setItem(this._key, JSON.stringify(SPACES)); } catch {}
   },
 
+  _normSpace(raw) {
+    if (!raw) return null;
+    const s = { ...raw };
+    if (typeof s.cohosts === 'string') {
+      try { s.cohosts = JSON.parse(s.cohosts); } catch { s.cohosts = []; }
+    } else if (!Array.isArray(s.cohosts)) {
+      s.cohosts = [];
+    }
+    if (typeof s.speakers === 'string') {
+      try { s.speakers = JSON.parse(s.speakers); } catch { s.speakers = []; }
+    } else if (!Array.isArray(s.speakers)) {
+      s.speakers = [];
+    }
+    if (typeof s.description === 'string') s.topic = s.description;
+    if (typeof s.when_text === 'string') s.scheduled = s.when_text;
+    s.listeners = Number(s.listeners) || 0;
+    s.reminders = Number(s.reminders) || 0;
+    return s;
+  },
+
   async list() {
     const sb = this._sb();
-    if (sb) return sb.listSpaces();
+    if (sb) return (sb.listSpaces() || []).map(s => this._normSpace(s));
     return [...SPACES];
   },
 
   async get(id) {
     const sb = this._sb();
-    if (sb) return sb.getSpace(id);
+    if (sb) return this._normSpace(await sb.getSpace(id));
     return SPACES.find(s => s.id === id) || null;
   },
 
   async create(space) {
     const sb = this._sb();
-    if (sb) return sb.createSpace(space);
+    if (sb) return this._normSpace(await sb.createSpace(space));
     SPACES.push(space);
     this._persist();
     return space;
@@ -800,7 +820,7 @@ const spaceService = {
 
   async update(id, changes) {
     const sb = this._sb();
-    if (sb) { await sb.updateSpace(id, changes); return changes; }
+    if (sb) { await sb.updateSpace(id, changes); return this._normSpace(await sb.getSpace(id)); }
     const idx = SPACES.findIndex(s => s.id === id);
     if (idx === -1) return null;
     Object.assign(SPACES[idx], changes);
@@ -859,7 +879,25 @@ const spaceService = {
     }
     const space = SPACES.find(s => s.id === id);
     if (!space) return null;
-    space.listeners = (space.listeners || 0) + by;
+      space.listeners = (space.listeners || 0) + by;
+    this._persist();
+    return space;
+  },
+
+  async toggleReminder(id, on, userHandle) {
+    const handle = userHandle || 'testuser';
+    const sb = this._sb();
+    if (sb) {
+      const space = await this.get(id);
+      if (!space) return null;
+      const set = new Set(space.reminder_handles || []);
+      if (on) set.add(handle); else set.delete(handle);
+      const result = await this.update(id, { reminder_handles: [...set], reminders: set.size });
+      return result;
+    }
+    const space = SPACES.find(s => s.id === id);
+    if (!space) return null;
+    space.reminders = Math.max(0, (space.reminders || 0) + (on ? 1 : -1));
     this._persist();
     return space;
   },
