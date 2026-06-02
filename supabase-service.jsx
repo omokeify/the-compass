@@ -153,10 +153,17 @@ const supabaseService = {
 
   // ===== Profile =====
   async getProfile(userId) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=*`, {
-      headers: authHeaders(),
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
+      headers: { 'apikey': SUPABASE_ANON_KEY },
     });
-    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.[0] || null;
+  },
+
+  async getProfileByHandle(handle) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?handle=eq.${encodeURIComponent(handle)}&select=handle,email`, {
+      headers: { 'apikey': SUPABASE_ANON_KEY },
+    });
     const data = await res.json();
     return data?.[0] || null;
   },
@@ -168,6 +175,17 @@ const supabaseService = {
       body: JSON.stringify(updates),
     });
     return res.ok;
+  },
+
+  async checkHandle(handle) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?handle=eq.${encodeURIComponent(handle)}&select=handle`, {
+        headers: { 'apikey': SUPABASE_ANON_KEY },
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data?.length > 0 ? data[0] : null;
+    } catch { return null; }
   },
 
   // ===== Posts =====

@@ -9,6 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 ALTER TABLE public.profiles 
   ADD COLUMN IF NOT EXISTS handle TEXT UNIQUE,
   ADD COLUMN IF NOT EXISTS avatar TEXT,
+  ADD COLUMN IF NOT EXISTS email TEXT,
   ADD COLUMN IF NOT EXISTS hue INTEGER DEFAULT 215,
   ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT '',
   ADD COLUMN IF NOT EXISTS loc TEXT DEFAULT '',
@@ -20,11 +21,12 @@ ALTER TABLE public.profiles
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, fullname, handle, avatar)
+  INSERT INTO public.profiles (id, fullname, handle, email, avatar)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'fullname', NEW.email),
     COALESCE(NEW.raw_user_meta_data->>'handle', 'user_' || substr(NEW.id::text, 1, 8)),
+    NEW.email,
     ''
   );
   RETURN NEW;

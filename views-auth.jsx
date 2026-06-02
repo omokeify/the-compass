@@ -8,11 +8,24 @@ const AuthPage = ({ initialMode = 'signin', onSignedIn, onSignedUp }) => {
   const [handle, setHandle] = React.useState('');
   const [showPw, setShowPw] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  const [handleStatus, setHandleStatus] = React.useState(null); // null | 'checking' | 'available' | 'taken'
+  const handleTimer = React.useRef(null);
 
   const isSignup = mode === 'signup';
+
+  const checkHandle = (value) => {
+    if (!value || value.length < 3) { setHandleStatus(null); return; }
+    setHandleStatus('checking');
+    clearTimeout(handleTimer.current);
+    handleTimer.current = setTimeout(async () => {
+      const result = await window.supabaseService?.checkHandle(value);
+      setHandleStatus(result ? 'taken' : 'available');
+    }, 400);
+  };
+
   const valid = isSignup
-    ? email.includes('@') && pw.length >= 6 && name.trim() && handle.trim().length >= 3
-    : email.includes('@') && pw.length >= 1;
+    ? email.includes('@') && pw.length >= 6 && name.trim() && handle.trim().length >= 3 && handleStatus === 'available'
+    : (email.includes('@') || email.trim().length >= 3) && pw.length >= 1;
 
   const submit = () => {
     if (!valid || busy) return;
@@ -99,14 +112,19 @@ const AuthPage = ({ initialMode = 'signin', onSignedIn, onSignedUp }) => {
                   <span className="field-label">Handle</span>
                   <div className="field-with-prefix">
                     <span className="field-prefix">@</span>
-                    <input className="field-input" placeholder="ada" value={handle} onChange={e => setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g,''))} />
+                    <input className="field-input" placeholder="ada" value={handle} onChange={e => { const v = e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g,''); setHandle(v); checkHandle(v); }} />
+                    {handleStatus && (
+                      <span className="field-suffix" style={{ fontSize: 12, color: handleStatus === 'available' ? 'var(--green)' : handleStatus === 'taken' ? 'var(--red)' : 'var(--text-2)' }}>
+                        {handleStatus === 'checking' ? '…' : handleStatus === 'available' ? '✓ Available' : '✕ Taken'}
+                      </span>
+                    )}
                   </div>
                 </label>
               </div>
             )}
             <label className="field">
-              <span className="field-label">Email</span>
-              <input className="field-input" type="email" placeholder="you@studio.dev" value={email} onChange={e => setEmail(e.target.value)} />
+              <span className="field-label">{isSignup ? 'Email' : 'Email or handle'}</span>
+              <input className="field-input" type={isSignup ? 'email' : 'text'} placeholder={isSignup ? 'you@studio.dev' : 'you@studio.dev or @ada'} value={email} onChange={e => setEmail(e.target.value)} />
             </label>
             <label className="field">
               <span className="field-label-row">
@@ -121,8 +139,8 @@ const AuthPage = ({ initialMode = 'signin', onSignedIn, onSignedUp }) => {
           </div>
 
           <button className="btn primary lg auth-submit" disabled={!valid || busy} onClick={submit}>
-            {busy ? 'One moment…' : (isSignup ? 'Create account' : 'Sign in')}
-            {!busy && <Icon name="arrow-right" size={14} />}
+            {isSignup ? 'Create account' : 'Sign in'}
+            <Icon name="arrow-right" size={14} />
           </button>
 
           <p className="auth-switch">

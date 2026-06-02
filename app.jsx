@@ -73,7 +73,13 @@ function App() {
   const signIn = async ({ email, password, onboardNext = false } = {}) => {
     if (email && password) {
       try {
-        const { user } = await supabaseService.signIn({ email, password });
+        let loginEmail = email;
+        if (!email.includes('@')) {
+          const profile = await supabaseService.getProfileByHandle(email);
+          if (!profile?.email) { showToast('Handle not found'); return; }
+          loginEmail = profile.email;
+        }
+        const { user } = await supabaseService.signIn({ email: loginEmail, password });
         const profile = await supabaseService.getProfile(user.id);
         setCurrentUser(mapSbProfile(user, profile));
       } catch (e) {
@@ -89,8 +95,7 @@ function App() {
   const signUp = async ({ email, password, name, handle }) => {
     try {
       const { user } = await supabaseService.signUp({ email, password, fullname: name, handle });
-      const profile = await supabaseService.getProfile(user.id);
-      setCurrentUser(mapSbProfile(user, profile));
+      setCurrentUser(mapSbProfile(user, { handle, fullname: name }));
       setLoggedIn(true);
       setOnboard(true);
       navigate({ view: 'feed' });
