@@ -37,3 +37,10 @@ livekit.md
 *.tmp
 *.temp
 .cache/
+*.err
+
+# Notes
+discourse-features.md
+
+# Service worker (auto-generated)
+sw.js
