@@ -1,7 +1,7 @@
 // Messages / DMs view — two-column conversation list + thread
 
 const MessagesPage = ({ navigate }) => {
-  const [activeId, setActiveId] = React.useState(CONVERSATIONS[0].id);
+  const [activeId, setActiveId] = React.useState(null);
   const [draft, setDraft] = React.useState('');
   const [convos, setConvos] = React.useState(CONVERSATIONS);
   const [search, setSearch] = React.useState('');
@@ -13,7 +13,7 @@ const MessagesPage = ({ navigate }) => {
     const text = draft.trim();
     setConvos(arr => arr.map(c =>
       c.id === activeId
-        ? { ...c, messages: [...c.messages, { from: 'kelechi.eth', when: 'just now', body: text }], last: text, lastWhen: 'just now' }
+        ? { ...c, messages: [...c.messages, { from: 'testuser', when: 'just now', body: text }], last: text, lastWhen: 'just now' }
         : c
     ));
     setDraft('');
@@ -71,8 +71,17 @@ const MessagesPage = ({ navigate }) => {
         </aside>
 
         {/* Thread */}
-        {active ? <MessageThread c={active} draft={draft} setDraft={setDraft} onSend={sendMessage} navigate={navigate} />
-                : <div className="msg-empty">Select a conversation.</div>}
+        {active ? (
+          <MessageThread c={active} draft={draft} setDraft={setDraft} onSend={sendMessage} navigate={navigate} />
+        ) : (
+          <div className="msg-thread msg-thread-empty">
+            <div className="msg-thread-empty-card">
+              <Icon name="chat" size={34} />
+              <h2>Choose a conversation</h2>
+              <p>Tap a message on the left to open its thread and keep your chat moving.</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -101,7 +110,7 @@ const MessageThread = ({ c, draft, setDraft, onSend, navigate }) => {
 
       <div className="msg-thread-body" ref={scrollRef}>
         {c.messages.map((m, i) => {
-          const mine = m.from === 'kelechi.eth';
+          const mine = m.from === 'testuser';
           const prev = c.messages[i - 1];
           const showHeader = !prev || prev.from !== m.from;
           return (

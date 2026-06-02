@@ -8,7 +8,6 @@ const SavedPage = ({ navigate, embedded }) => {
     { id: 'all', label: 'All' },
     { id: 'post', label: 'Posts' },
     { id: 'gig', label: 'Talent' },
-    { id: 'bounty', label: 'Bounties' },
     { id: 'member', label: 'Members' },
   ];
   const list = filter === 'all' ? items : items.filter(i => i.type === filter);
@@ -17,7 +16,6 @@ const SavedPage = ({ navigate, embedded }) => {
     if (i.type === 'gig') navigate({ view: 'gig', id: i.id });
     else if (i.type === 'member') navigate({ view: 'profile', handle: i.handle });
     else if (i.type === 'post') navigate({ view: 'feed' });
-    else if (i.type === 'bounty') navigate({ view: 'bounties' });
   };
 
   const TYPE_META = {
@@ -219,65 +217,4 @@ const ProPage = ({ navigate }) => {
   );
 };
 
-// ============================ BOUNTIES BOARD ============================
-const BountiesPage = ({ navigate }) => {
-  const [filter, setFilter] = React.useState('open');
-  const [saved, setSaved] = React.useState({});
-  const list = BOUNTIES.filter(b => filter === 'all' ? true : b.status === filter);
-  const totalReward = BOUNTIES.filter(b => b.status === 'open').reduce((s, b) => s + b.reward, 0);
-
-  return (
-    <div className="view bounties-view">
-      <section className="lb-hero">
-        <div className="section-eyebrow"><span className="section-eyebrow-dot" /> Earn · Bounties</div>
-        <h1 className="section-title" style={{ fontSize: 'clamp(32px,4vw,48px)' }}>Bounties board.</h1>
-        <p className="section-sub">Paid, scoped tasks from projects across the ecosystem. Apply, ship, get paid in USDC through Compass escrow.</p>
-        <div className="bounty-summary">
-          <div className="bs-cell"><strong>${totalReward.toLocaleString()}</strong><span>open rewards</span></div>
-          <div className="bs-cell"><strong>{BOUNTIES.filter(b => b.status === 'open').length}</strong><span>open bounties</span></div>
-          <div className="bs-cell"><strong>7%</strong><span>platform fee</span></div>
-        </div>
-        <div className="lb-tabs" style={{ marginTop: 18 }}>
-          {['open','all','awarded'].map(f => (
-            <button key={f} className={`tf-pill ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>
-              {f[0].toUpperCase() + f.slice(1)}
-            </button>
-          ))}
-          <button className="btn primary" style={{ marginLeft: 'auto' }}><Icon name="plus" size={12} /> Post a bounty</button>
-        </div>
-      </section>
-
-      <div className="bounty-list">
-        {list.map(b => (
-          <article key={b.id} className={`bounty-card ${b.featured ? 'featured' : ''} ${b.status === 'awarded' ? 'awarded' : ''}`}>
-            <div className="bounty-org" style={{ background: `oklch(0.7 0.15 ${b.orgHue})` }}>{b.org[0]}</div>
-            <div className="bounty-main">
-              <div className="bounty-top">
-                {b.featured && <span className="bounty-flag">★ Featured</span>}
-                <span className="bounty-diff">{b.difficulty}</span>
-                {b.tags.map(t => <span key={t} className="bounty-tag">#{t}</span>)}
-              </div>
-              <h3 className="bounty-title">{b.title}</h3>
-              <div className="bounty-meta">
-                <span className="bounty-orgname">{b.org}</span>
-                <Dot />
-                <span>{b.deadline}</span>
-                <Dot />
-                <span>{b.applicants} applied</span>
-                {b.status === 'awarded' && <><Dot /><span className="bounty-won">Awarded to @{b.winner}</span></>}
-              </div>
-            </div>
-            <div className="bounty-right">
-              <div className="bounty-reward"><span className="br-n">${b.reward.toLocaleString()}</span><span className="br-t">{b.token}</span></div>
-              {b.status === 'open'
-                ? <button className="btn primary sm">Apply</button>
-                : <button className="btn ghost sm" disabled>Closed</button>}
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-Object.assign(window, { SavedPage, WalletPage, ProPage, BountiesPage });
+Object.assign(window, { SavedPage, WalletPage });

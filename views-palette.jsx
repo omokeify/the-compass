@@ -6,16 +6,14 @@ const PALETTE_NAV = [
   { label: 'Members',     view: 'members',     icon: 'users' },
   { label: 'Spaces',      view: 'spaces',      icon: 'mic' },
   { label: 'Talent',      view: 'talent',      icon: 'briefcase' },
-  { label: 'Bounties',    view: 'bounties',    icon: 'wallet' },
   { label: 'Messages',    view: 'messages',    icon: 'send' },
   { label: 'Events',      view: 'events',      icon: 'calendar' },
   { label: 'Leaderboard', view: 'leaderboard', icon: 'medal' },
   { label: 'Wallet',      view: 'profile',     tab: 'wallet', icon: 'wallet' },
   { label: 'Saved',       view: 'profile',     tab: 'saved',  icon: 'bookmark' },
-  { label: 'Compass Pro', view: 'pro',         icon: 'spark' },
 ];
 
-const CommandPalette = ({ onClose, navigate }) => {
+const CommandPalette = ({ onClose, navigate, currentUser }) => {
   const [q, setQ] = React.useState('');
   const [sel, setSel] = React.useState(0);
   const inputRef = React.useRef(null);
@@ -56,7 +54,7 @@ const CommandPalette = ({ onClose, navigate }) => {
   const flat = results.flatMap(r => r.items);
   const go = (item) => {
     onClose();
-    if (item.kind === 'nav') navigate(item.tab ? { view: item.view, handle: 'kelechi.eth', tab: item.tab } : { view: item.view });
+    if (item.kind === 'nav') navigate(item.tab ? { view: item.view, handle: currentUser?.handle || 'testuser', tab: item.tab } : { view: item.view });
     else if (item.kind === 'member') navigate({ view: 'profile', handle: item.handle });
     else if (item.kind === 'topic') navigate({ view: 'topic', topic: item.id });
     else if (item.kind === 'gig') navigate({ view: 'gig', id: item.id });

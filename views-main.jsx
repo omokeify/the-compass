@@ -1,7 +1,7 @@
 // Main views: Home, Category, Topic — modern light edition
 
 // ---------- HOME ----------
-const HomeFeed = ({ navigate, onCompose, onSignup, onJoinClass }) => {
+const HomeFeed = ({ navigate, currentUser, onCompose, onSignup, onJoinClass }) => {
   const liveClass = (window.CONFERENCES || []).find(c => c.status === 'live');
   return (
     <div className="view home">
@@ -30,6 +30,10 @@ const HomeFeed = ({ navigate, onCompose, onSignup, onJoinClass }) => {
       </FadeUp>
 
       <FadeUp>
+        <SpacesSection navigate={navigate} />
+      </FadeUp>
+
+      <FadeUp>
         <HomeFeedStream navigate={navigate} onCompose={onCompose} />
       </FadeUp>
 
@@ -42,11 +46,11 @@ const HomeFeed = ({ navigate, onCompose, onSignup, onJoinClass }) => {
       </FadeUp>
 
       <FadeUp>
-        <CategoriesSection navigate={navigate} />
+        <CategoriesSection navigate={navigate} currentUser={currentUser} />
       </FadeUp>
 
       <FadeUp>
-        <DiscussionsSection navigate={navigate} />
+        <DiscussionsSection navigate={navigate} currentUser={currentUser} />
       </FadeUp>
 
       <FadeUp>
@@ -76,7 +80,7 @@ const HomeFeedStream = ({ navigate, onCompose }) => {
       <div className="home-feed-layout">
         <div className="home-feed-col">
           <div className="feed-composer" onClick={onCompose}>
-            <Avatar user={userByHandle('kelechi.eth')} size={36} />
+            <Avatar user={userByHandle('testuser')} size={36} />
             <span className="fc-prompt">Share a signal, an alpha, or a question…</span>
             <span className="fc-tools">
               <Icon name="image" size={14} />
@@ -134,10 +138,10 @@ const OnlineMembersStrip = ({ navigate }) => {
       <div className="online-head">
         <div>
           <h2 className="online-title">
-            Online <span className="online-count"><span className="online-dot" />{ONLINE_MEMBERS.length * 53 + 12} now</span>
+            Online <span className="online-count"><span className="online-dot" />{ONLINE_MEMBERS.length} now</span>
           </h2>
         </div>
-        <button className="btn solid" onClick={() => navigate({ view: 'leaderboard' })}>
+        <button className="btn solid" onClick={() => navigate({ view: 'members' })}>
           See more <Icon name="arrow-right" size={12} />
         </button>
       </div>
@@ -213,6 +217,36 @@ const ContentSection = ({ navigate }) => {
   );
 };
 
+// ---------- Spaces Section (home page) ----------
+const SpacesSection = ({ navigate }) => {
+  const live = SPACES.filter(s => s.status === 'live');
+  const upcoming = SPACES.filter(s => s.status === 'scheduled').slice(0, 3);
+
+  if (live.length === 0 && upcoming.length === 0) return null;
+
+  return (
+    <div className="section">
+      <div className="section-head">
+        <div>
+          <div className="section-eyebrow"><span className="section-eyebrow-dot" /> Live audio</div>
+          <h2 className="section-title">
+            {live.length > 0 ? `${live.length} space${live.length > 1 ? 's' : ''} live now` : 'Upcoming spaces.'}
+          </h2>
+        </div>
+        <div className="section-tools">
+          <button className="section-link" onClick={() => navigate({ view: 'spaces' })}>
+            All spaces <Icon name="arrow-right" size={12} />
+          </button>
+        </div>
+      </div>
+      <div className="spaces-grid" style={{ marginTop: 8 }}>
+        {live.map(s => <SpaceCard key={s.id} space={s} onJoin={() => spaceService.bumpListeners(s.id, 1)} navigate={navigate} />)}
+        {upcoming.map(s => <SpaceCard key={s.id} space={s} onJoin={() => {}} navigate={navigate} />)}
+      </div>
+    </div>
+  );
+};
+
 // ---------- Hero Card (Arc-style dark gradient + parallax) ----------
 const HeroCard = ({ navigate, onCompose, onSignup }) => {
   const starsRef = useParallax(0.08);
@@ -259,7 +293,7 @@ const HeroCard = ({ navigate, onCompose, onSignup }) => {
             </button>
           </div>
           <div className="hero-trust">
-            <AvatarStack handles={['compass.eth','degenscout','0xforesight','kelechi.eth','fatima.lens']} size={26} max={5} />
+            <AvatarStack handles={['testuser']} size={26} max={5} />
             <span><strong>4.9</strong> · 1,284 builders trust Compass for their daily edge.</span>
           </div>
         </div>
@@ -281,14 +315,7 @@ const HeroCard = ({ navigate, onCompose, onSignup }) => {
 
 // ---------- Events Section (horizontal scroller) ----------
 const EventsSection = ({ navigate }) => {
-  const events = [
-    { id: 'lagos', title: 'Lagos Web3 Week', sub: 'Conferences, side events, builder house', date: 'Jun 12 – 15', going: 312, kind: 'IRL', tag: 'Now', from: '#1a2444', to: '#3d2a6e' },
-    { id: 'base-ama', title: 'AMA: Base ecosystem fund', sub: 'With the Base BD team', date: 'Tue · 7pm WAT', going: 184, kind: 'Live', from: '#0052ff', to: '#5b8fff' },
-    { id: 'zk', title: 'ZK Fundamentals', sub: 'Six-week live cohort begins', date: 'Jun 3', going: 96, kind: 'Course', from: '#cfe6b8', to: '#7fb86b' },
-    { id: 'nairobi', title: 'Nairobi Builders Meetup', sub: 'iHub, third Sunday of the month', date: 'Jun 8', going: 78, kind: 'IRL', from: '#f7705a', to: '#c4350f' },
-    { id: 'rep', title: 'On-chain rep systems', sub: 'Panel with Mosi, Kelechi & guests', date: 'Jun 18', going: 142, kind: 'Live', from: '#b89ef0', to: '#6446b0' },
-    { id: 'voi', title: 'Voice of Impact', sub: 'June livestream + community awards', date: 'Jun 28', going: 220, kind: 'Live', from: '#f0c1c9', to: '#c4707c' },
-  ];
+  const events = [];
 
   return (
     <div className="section">
@@ -297,7 +324,7 @@ const EventsSection = ({ navigate }) => {
           <div className="section-eyebrow">
             <span className="section-eyebrow-dot" /> Happening soon
           </div>
-          <h2 className="section-title">Events worth showing up for.</h2>
+
         </div>
         <div className="section-tools">
           <button className="section-link" onClick={() => navigate({ view: 'events' })}>
@@ -329,7 +356,8 @@ const EventsSection = ({ navigate }) => {
 };
 
 // ---------- Categories Section (Gradual-style pastel grid) ----------
-const CategoriesSection = ({ navigate }) => {
+const CategoriesSection = ({ navigate, currentUser }) => {
+  const visibleCategories = currentUser ? CATEGORIES.filter(cat => canViewCategory(currentUser, cat.id)) : CATEGORIES;
   return (
     <div className="section">
       <div className="section-head">
@@ -343,7 +371,7 @@ const CategoriesSection = ({ navigate }) => {
         </div>
       </div>
       <div className="cat-grid">
-        {CATEGORIES.map((cat, i) => {
+        {visibleCategories.map((cat, i) => {
           const meta = CAT_META[cat.id];
           const decoClass = ['deco-rings', 'deco-blob', 'deco-stripes', 'deco-grid'][i % 4];
           return (
@@ -359,7 +387,6 @@ const CategoriesSection = ({ navigate }) => {
               <div className="cat-card-num">{cat.code} / 08 — {cat.name.split(' ')[0]}</div>
               <h3 className="cat-card-title">{cat.name}</h3>
               <div className="cat-card-meta">
-                <span>{formatNum(cat.posts)} posts</span>
                 <Icon name="arrow-right" size={14} />
               </div>
             </article>
@@ -371,7 +398,7 @@ const CategoriesSection = ({ navigate }) => {
 };
 
 // ---------- Discussions Section ----------
-const DiscussionsSection = ({ navigate }) => {
+const DiscussionsSection = ({ navigate, currentUser }) => {
   const [filter, setFilter] = React.useState('latest');
   const filters = [
     { id: 'latest', label: 'Latest' },
@@ -381,6 +408,7 @@ const DiscussionsSection = ({ navigate }) => {
   ];
 
   let list = [...TOPICS];
+  if (currentUser) list = list.filter(t => canViewTopic(currentUser, t));
   if (filter === 'top') list.sort((a, b) => b.likes - a.likes);
   else if (filter === 'hot') list = list.filter(t => t.hot || t.pinned);
   else if (filter === 'unread') list = list.slice(0, 4);
@@ -430,8 +458,8 @@ const MembersSection = ({ navigate }) => {
           <h2 className="section-title">Top navigators this month.</h2>
         </div>
         <div className="section-tools">
-          <button className="section-link" onClick={() => navigate({ view: 'leaderboard' })}>
-            Full leaderboard <Icon name="arrow-right" size={12} />
+          <button className="section-link" onClick={() => navigate({ view: 'members' })}>
+            See all members <Icon name="arrow-right" size={12} />
           </button>
         </div>
       </div>
@@ -466,6 +494,7 @@ const TopicRow = ({ topic, navigate }) => {
           {topic.hot && <span className="tr-flag hot"><Icon name="flame" size={10} /> hot</span>}
           {topic.validated && <span className="tr-flag validated"><Icon name="check" size={10} /> validated</span>}
           {topic.locked && <span className="tr-flag lock"><Icon name="lock" size={10} /> {topic.locked}+</span>}
+          {topic.type === 'blog' && <span className="tr-flag blog" style={{ background: 'var(--brand-yellow)', color: '#000' }}><Icon name="edit" size={10} /> blog</span>}
           <h3 className="tr-title">{topic.title}</h3>
         </div>
         <div className="tr-meta">
@@ -490,13 +519,61 @@ const TopicRow = ({ topic, navigate }) => {
 };
 
 // ---------- CATEGORY PAGE ----------
-const CategoryPage = ({ catId, navigate, onCompose }) => {
+const CategoryPage = ({ catId, navigate, onCompose, currentUser, showToast }) => {
   const cat = CATEGORIES.find(c => c.id === catId);
-  const topics = TOPICS.filter(t => t.cat === catId);
   const meta = CAT_META[catId];
   const [tab, setTab] = React.useState('latest');
+  const locked = !canViewCategory(currentUser, catId);
+  const canPost = canPostCategory(currentUser, catId);
+  const visibleTopics = TOPICS.filter(t => t.cat === catId && canViewTopic(currentUser, t));
+  const hiddenTopicCount = TOPICS.filter(t => t.cat === catId && !canViewTopic(currentUser, t)).length;
+  const [subscribed, setSubscribed] = React.useState(() => {
+    try {
+      const list = JSON.parse(localStorage.getItem('compass_subscriptions_v1') || '[]');
+      return list.includes(catId);
+    } catch { return false; }
+  });
+  const toggleSubscribe = () => {
+    try {
+      const list = JSON.parse(localStorage.getItem('compass_subscriptions_v1') || '[]');
+      const next = subscribed ? list.filter(id => id !== catId) : [...list, catId];
+      localStorage.setItem('compass_subscriptions_v1', JSON.stringify(next));
+      setSubscribed(!subscribed);
+      showToast?.(subscribed ? 'Unsubscribed' : `Subscribed to ${cat.name}`);
+      window.dispatchEvent(new Event('compass_subscriptions_changed'));
+    } catch {}
+  };
 
   const isLight = !meta.dark;
+  if (locked) {
+    return (
+      <div className="view category">
+        <section
+          className="cat-hero"
+          style={{
+            '--cat-hero-bg': meta.bg,
+            '--cat-hero-fg': isLight ? meta.fg : '#fff',
+            color: isLight ? meta.fg : '#fff',
+          }}
+        >
+          <span className="cat-hero-deco" />
+          <div>
+            <div className="cat-hero-eyebrow">
+              <span>{cat.code} / 08 · {cat.name}</span>
+              {cat.premium && <span>· ✦ Premium</span>}
+            </div>
+            <h1 className="cat-hero-title">{cat.name}.</h1>
+            <p className="cat-hero-desc">{cat.desc}</p>
+          </div>
+        </section>
+        <div className="category-locked-panel">
+          <h2>Category locked</h2>
+          <p>You don’t have enough level access to enter this discussion yet.</p>
+          <p className="locked-note">Reach {requiredLevelLabel(getCategoryAccess(catId).view)} to view {cat.name}.</p>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="view category">
       <section
@@ -517,17 +594,14 @@ const CategoryPage = ({ catId, navigate, onCompose }) => {
           <p className="cat-hero-desc">{cat.desc}</p>
         </div>
         <div className="cat-hero-foot">
-          <div className="cat-hero-stats">
-            <div className="chs"><div className="chs-n">{formatNum(cat.posts)}</div><div className="chs-l">topics</div></div>
-            <div className="chs"><div className="chs-n">{formatNum(cat.posts * 7)}</div><div className="chs-l">replies</div></div>
-            <div className="chs"><div className="chs-n">{cat.moderators?.length || 2}</div><div className="chs-l">moderators</div></div>
-          </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button className={isLight ? 'btn primary' : 'btn solid'} onClick={onCompose}>
-              <Icon name="plus" size={13} /> New post
-            </button>
-            <button className="btn ghost" style={isLight ? {} : { borderColor: 'rgba(255,255,255,0.3)', color: '#fff' }}>
-              Subscribe
+            {canPost && (
+              <button className={isLight ? 'btn primary' : 'btn solid'} onClick={onCompose}>
+                <Icon name="plus" size={13} /> New post
+              </button>
+            )}
+            <button className="btn ghost btn-subscribe" style={isLight ? {} : { borderColor: 'rgba(255,255,255,0.3)', color: '#fff' }} onClick={toggleSubscribe}>
+              {subscribed ? 'Subscribed' : 'Subscribe'}
             </button>
           </div>
         </div>
@@ -543,13 +617,63 @@ const CategoryPage = ({ catId, navigate, onCompose }) => {
                 </button>
               ))}
             </div>
-            <div className="df-head-title">{topics.length} topics</div>
+            <div className="df-head-title">{visibleTopics.length} topics</div>
           </div>
-          {topics.length === 0
+          {visibleTopics.length === 0
             ? <div className="empty">No topics yet — be the first to post here.</div>
-            : topics.map(t => <TopicRow key={t.id} topic={t} navigate={navigate} />)}
+            : visibleTopics.map(t => <TopicRow key={t.id} topic={t} navigate={navigate} />)}
+          {hiddenTopicCount > 0 && (
+            <div className="empty locked-note">
+              {hiddenTopicCount} topic{hiddenTopicCount === 1 ? '' : 's'} are locked until you reach {requiredLevelLabel(Math.min(...TOPICS.filter(t => t.cat === catId && !canViewTopic(currentUser, t)).map(t => parseLockLevel(t.locked) || getCategoryAccess(catId).view)))}.
+            </div>
+          )}
         </div>
       </FadeUp>
+    </div>
+  );
+};
+
+// ============================ CONTENT MANAGEMENT (Mod/Admin) ============================
+const ContentPage = ({ navigate, currentUser }) => {
+  const canManage = canCreateEvent(currentUser);
+  if (!canManage) return <div className="view"><div className="empty">Access restricted to moderators and admins.</div></div>;
+  return (
+    <div className="view">
+      <section className="lb-hero">
+        <div className="section-eyebrow"><span className="section-eyebrow-dot" /> Editorial</div>
+        <h1 className="section-title" style={{ fontSize: 'clamp(32px,4vw,48px)' }}>Content manager.</h1>
+        <p className="section-sub">Publish and manage editorial content — partner spotlights, research, field notes, tutorials, and more.</p>
+      </section>
+      <div className="content-grid" style={{ marginTop: 24 }}>
+        {CONTENT_ITEMS.map(item => {
+          const bg = CONTENT_BG[item.bg] || CONTENT_BG.navy;
+          const author = userByHandle(item.author);
+          return (
+            <article key={item.id} className="content-card" style={{ '--cc-from': bg.from, '--cc-to': bg.to }} onClick={() => navigate({ view: 'article', id: item.id })}>
+              <div className="cc-cover">
+                <div className="cc-grid" />
+                <div className="cc-rings" />
+                <div className="cc-kind">{`{ ${item.kind.toUpperCase()} }`}</div>
+                <h3 className="cc-title">{item.title}</h3>
+              </div>
+              <div className="cc-body">
+                <div className="cc-author">
+                  <Avatar user={author} size={22} />
+                  <span>{author.name}</span>
+                </div>
+                <div className="cc-meta">
+                  <span>{item.when}</span>
+                  <Dot />
+                  <span>{item.minutes} min read</span>
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+      <div style={{ marginTop: 24, display: 'flex', gap: 10 }}>
+        <button className="btn primary"><Icon name="plus" size={13} /> New piece</button>
+      </div>
     </div>
   );
 };
@@ -557,5 +681,5 @@ const CategoryPage = ({ catId, navigate, onCompose }) => {
 Object.assign(window, {
   HomeFeed, HeroCard, EventsSection, CategoriesSection, DiscussionsSection,
   MembersSection, TopicRow, CategoryPage, OnlineMembersStrip, ContentSection,
-  HomeFeedStream, CONTENT_BG,
+  SpacesSection, ContentPage, HomeFeedStream, CONTENT_BG,
 });

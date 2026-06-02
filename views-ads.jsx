@@ -27,11 +27,11 @@ const AD_BANNERS = [
   },
   {
     id: 'a3',
-    sponsor: 'The Compass Pro',
+    sponsor: 'The Compass',
     eyebrow: 'Upgrade',
     title: 'Unlock Navigator-tier alpha, premium training, and reduced platform fees.',
-    sub: '$19/mo — free for the first 30 days. Cancel anytime.',
-    cta: 'Try Compass Pro',
+    sub: 'Free for the first 30 days. Cancel anytime.',
+    cta: 'Try Compass',
     bg: 'linear-gradient(120deg, #0b0b0b 0%, #2a2a2a 100%)',
     fg: '#fff',
     accent: '#FFEA00',
@@ -46,8 +46,8 @@ const HOME_AD_BANNERS = [
     sponsor: 'The Compass',
     eyebrow: 'Free to join',
     title: 'One compass for every African Web3 opportunity.',
-    sub: 'Join 14,820 builders trading curated alpha, validated bounties, training and IRL events.',
-    cta: 'Join free — 20 seconds',
+    sub: 'Join builders trading curated alpha, validated bounties, training and IRL events.',
+    cta: 'Join free \u2014 20 seconds',
     bg: 'linear-gradient(120deg, #0b0b0b 0%, #1a1a1a 60%, #2d2d2d 100%)',
     fg: '#fff',
     accent: '#FFEA00',
@@ -56,7 +56,7 @@ const HOME_AD_BANNERS = [
   },
   {
     id: 'h2',
-    sponsor: 'Polygon × Compass',
+    sponsor: 'Polygon \u00d7 Compass',
     eyebrow: 'Creator Program',
     title: '30 creators. 6 months. $400/mo retainer + distribution.',
     sub: 'Applications open June 5. Brief and review by the Compass content team.',
@@ -70,7 +70,7 @@ const HOME_AD_BANNERS = [
     id: 'h3',
     sponsor: 'Compass Academy',
     eyebrow: 'New cohort',
-    title: 'ZK Fundamentals — a six-week live cohort, starts June 3.',
+    title: 'ZK Fundamentals \u2014 a six-week live cohort, starts June 3.',
     sub: 'Cohort capped at 50 builders. Early-bird 30% off, ends Friday. On-chain certificate.',
     cta: 'Enroll today',
     bg: 'linear-gradient(120deg, #cfe6b8 0%, #7fb86b 100%)',
@@ -82,7 +82,7 @@ const HOME_AD_BANNERS = [
     id: 'h4',
     sponsor: 'Lagos Web3 Week',
     eyebrow: 'Event partner',
-    title: 'Lagos Web3 Week · June 12–15. Submit your side event by Wednesday.',
+    title: 'Lagos Web3 Week \u00b7 June 12\u201315. Submit your side event by Wednesday.',
     sub: 'Hosts get 3 featured slots, cross-promo across all Compass channels, and a partner booth.',
     cta: 'Submit event',
     bg: 'linear-gradient(120deg, #1a2444 0%, #3d2a6e 60%, #6b3aa5 100%)',
@@ -97,10 +97,12 @@ const AdCarousel = ({ banners = AD_BANNERS, autorotate = 7000, onAction }) => {
   const len = banners.length;
 
   React.useEffect(() => {
-    if (!autorotate) return;
+    if (!autorotate || len === 0) return;
     const id = setInterval(() => setIdx(i => (i + 1) % len), autorotate);
     return () => clearInterval(id);
   }, [len, autorotate]);
+
+  if (len === 0) return null;
 
   return (
     <section className="ad-hero">

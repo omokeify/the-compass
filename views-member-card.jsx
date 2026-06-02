@@ -29,7 +29,7 @@ const MemberCard = ({ handle, onClose, navigate }) => {
   const [bookmarked, setBookmarked] = React.useState(false);
   const [following, setFollowing] = React.useState(false);
   const links = buildLinks(m);
-  const kp = (userByHandle(m.handle) || {}).kp || (948 + (m.handle.length * 37) % 9000);
+  const kp = (userByHandle(m.handle) || {}).kp || 0;
 
   React.useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };

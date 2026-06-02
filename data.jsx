@@ -10,7 +10,7 @@ const CATEGORIES = [
     hue: 215, // blue
     icon: 'news',
     posts: 1284,
-    moderators: ['compass.eth', 'signal_op'],
+    moderators: ['testuser'],
   },
   {
     id: 'alpha',
@@ -21,7 +21,7 @@ const CATEGORIES = [
     hue: 50, // amber
     icon: 'alpha',
     posts: 743,
-    moderators: ['degenscout', '0xforesight'],
+    moderators: ['testuser'],
     premium: true,
   },
   {
@@ -87,633 +87,717 @@ const CATEGORIES = [
 ];
 
 const USERS = [
-  { handle: 'kelechi.eth', name: 'Kelechi Okeke', tier: 'Captain', kp: 12480, joined: '2024-03-12', bio: 'Building African Web3 infra. Compass mod.', loc: 'Lagos, NG', avatar: 'K', hue: 25 },
-  { handle: 'degenscout', name: 'Amara', tier: 'Navigator', kp: 9320, joined: '2024-05-02', bio: 'Alpha hunter. On-chain since 2020.', loc: 'Nairobi, KE', avatar: 'A', hue: 50 },
-  { handle: '0xforesight', name: '0xForesight', tier: 'Navigator', kp: 8104, joined: '2024-06-18', bio: 'Validating alphas. Ex-Solana DevRel.', loc: 'Cape Town, ZA', avatar: '0', hue: 145 },
-  { handle: 'tinuke.builds', name: 'Tinuke A.', tier: 'Scout', kp: 6210, joined: '2024-08-04', bio: 'Frontend dev. Looking for grants.', loc: 'Lagos, NG', avatar: 'T', hue: 290 },
-  { handle: 'mosi_dao', name: 'Mosi', tier: 'Scout', kp: 4920, joined: '2024-09-21', bio: 'DAO governance, retroPGF, public goods.', loc: 'Kigali, RW', avatar: 'M', hue: 215 },
-  { handle: 'signal_op', name: 'Signal', tier: 'Captain', kp: 14210, joined: '2023-11-08', bio: 'News curator. 8 yrs in trading.', loc: 'Abuja, NG', avatar: 'S', hue: 195 },
-  { handle: 'ayo.web3', name: 'Ayodele', tier: 'Cadet', kp: 1820, joined: '2025-02-14', bio: 'Learning solidity. First airdrop hunter.', loc: 'Accra, GH', avatar: 'A', hue: 340 },
-  { handle: 'compass.eth', name: 'Compass Team', tier: 'Official', kp: 99999, joined: '2023-09-01', bio: 'Official account of The Compass.', loc: 'Everywhere', avatar: 'C', hue: 65 },
-  { handle: 'nana_btc', name: 'Nana Kofi', tier: 'Scout', kp: 3550, joined: '2024-12-10', bio: 'BTC maxi w/ ETH allergies. Sometimes.', loc: 'Accra, GH', avatar: 'N', hue: 18 },
-  { handle: 'fatima.lens', name: 'Fatima', tier: 'Navigator', kp: 7008, joined: '2024-04-30', bio: 'Content × culture × community.', loc: 'Casablanca, MA', avatar: 'F', hue: 85 },
-  { handle: 'kweku.sol', name: 'Kweku', tier: 'Cadet', kp: 920, joined: '2025-04-02', bio: 'Solana validator side quest.', loc: 'Tema, GH', avatar: 'K', hue: 110 },
-  { handle: 'iyabo_nft', name: 'Iyabo', tier: 'Scout', kp: 2840, joined: '2025-01-19', bio: 'Visual artist, on-chain since 2022.', loc: 'Ibadan, NG', avatar: 'I', hue: 305 },
+  { handle: 'testuser', name: 'Test User', tier: 'Cadet', kp: 0, joined: '2024-01-15', bio: 'Testing the Compass access control features.', loc: 'Accra, GH', avatar: 'T', hue: 215 },
+  { handle: 'amara',   name: 'Amara Osei',      tier: 'Navigator', kp: 5200, joined: '2024-03-10', bio: 'Smart contract auditor with 6 years in DeFi security.', loc: 'Nairobi, KE', avatar: 'A', hue: 260 },
+  { handle: 'felix',   name: 'Felix Nwosu',     tier: 'Captain',   kp: 7800, joined: '2024-02-01', bio: 'Full-stack engineer building on Solana and EVM chains.', loc: 'Lagos, NG', avatar: 'F', hue: 150 },
+  { handle: 'zara',    name: 'Zara Haile',      tier: 'Ranger',    kp: 3100, joined: '2024-05-20', bio: 'Motion designer helping Web3 projects tell better stories.', loc: 'Addis Ababa, ET', avatar: 'Z', hue: 340 },
 ];
+
+const LEVEL_NAMES = ['Cadet', 'Scout', 'Ranger', 'Navigator', 'Captain', 'Commander', 'Marshal', 'Admiral', 'Official'];
+const LEVEL_THRESHOLDS = [0, 1000, 2500, 4500, 7000, 9500, 12500, 16000, 22000];
+
+const getLevelFromKp = (kp = 0) => {
+  let level = 1;
+  for (let i = 0; i < LEVEL_THRESHOLDS.length; i += 1) {
+    if (kp >= LEVEL_THRESHOLDS[i]) level = i + 1;
+  }
+  return Math.min(level, LEVEL_NAMES.length);
+};
+
+const getLevelName = (level) => {
+  const idx = Math.max(1, Math.min(level, LEVEL_NAMES.length)) - 1;
+  return LEVEL_NAMES[idx];
+};
+
+const getUserLevel = (user) => user ? getLevelFromKp(user.kp) : 1;
+
+const parseLockLevel = (value) => {
+  if (value == null) return 1;
+  if (typeof value === 'number') return Math.max(1, Math.min(value, LEVEL_NAMES.length));
+  const str = String(value).trim();
+  const found = LEVEL_NAMES.findIndex(name => name.toLowerCase() === str.toLowerCase());
+  if (found !== -1) return found + 1;
+  const parsed = Number(str.replace(/[^0-9]/g, ''));
+  return Number.isInteger(parsed) && parsed >= 1 ? Math.min(parsed, LEVEL_NAMES.length) : 1;
+};
+
+const CATEGORY_ACCESS = {
+  news:        { view: 1, post: 9, reply: 1 },
+  earn:        { view: 3, post: 9, reply: 1 },
+  skills:      { view: 4, post: 9, reply: 2 },
+  activities:  { view: 99, post: 99, reply: 99 },
+  events:      { view: 1, post: 9, reply: 1 },
+  training:    { view: 3, post: 9, reply: 1 },
+  alpha:       { view: 5, post: 6, reply: 6 },
+  partnership: { view: 1, post: 9, reply: 9 },
+};
+
+const getCategoryAccess = (catId) => CATEGORY_ACCESS[catId] || { view: 1, post: 9, reply: 9 };
+
+const canViewCategory = (user, catId) => {
+  const access = getCategoryAccess(catId);
+  return getUserLevel(user) >= access.view;
+};
+
+const canPostCategory = (user, catId) => {
+  const access = getCategoryAccess(catId);
+  return getUserLevel(user) >= access.post;
+};
+
+const canReplyCategory = (user, catId) => {
+  const access = getCategoryAccess(catId);
+  return getUserLevel(user) >= access.reply;
+};
+
+const canViewTopic = (user, topic) => {
+  const req = topic.locked ? parseLockLevel(topic.locked) : getCategoryAccess(topic.cat).view;
+  return getUserLevel(user) >= req;
+};
+
+const canReplyTopic = (user, topic) => {
+  const topicLevel = topic.locked ? parseLockLevel(topic.locked) : 1;
+  const replyReq = Math.max(topicLevel, getCategoryAccess(topic.cat).reply);
+  return getUserLevel(user) >= replyReq;
+};
+
+const requiredLevelLabel = (level) => {
+  const lvl = parseLockLevel(level);
+  return `${getLevelName(lvl)} · Level ${lvl}`;
+};
 
 const userByHandle = (h) => USERS.find(u => u.handle === h) || USERS[0];
 
-const TAGS = [
-  'airdrops', 'solana', 'base', 'monad', 'bounty', 'rwa', 'defi', 'restaking',
-  'depin', 'zk', 'optimism', 'starknet', 'memecoins', 'governance', 'farcaster',
-  'lens', 'african-web3', 'beginner', 'remote-job', 'grant', 'hackathon', 'audit',
-];
+const TAGS = [];
 
-const TOPICS = [
-  {
-    id: 't1',
-    title: 'Monad mainnet airdrop checker is live — eligibility window closes Friday',
-    cat: 'alpha',
-    tags: ['airdrops', 'monad'],
-    author: 'degenscout',
-    created: '2026-05-25T08:14:00Z',
-    lastActivity: '12m',
-    replies: 84,
-    views: 4210,
-    likes: 312,
-    pinned: true,
-    hot: true,
-    validated: true,
-    participants: ['degenscout', '0xforesight', 'kelechi.eth', 'compass.eth', 'mosi_dao', 'fatima.lens'],
-    body: `Just dropped — the Monad eligibility checker is live at checker dot monad. Cut-off is 23:59 UTC Friday. Three signal patterns I've validated against 40+ wallets:\n\n• Bridge volume ≥ $250 across 2+ epochs\n• Min 12 unique contracts interacted\n• Hold a Monad testnet OAT (the gold one, not the participation one)\n\nIf you missed testnet there's still a path via the ecosystem partners. Don't sleep.`,
-    replyThread: [
-      { author: '0xforesight', when: '2h', body: 'Cross-checked against my 6 wallets. The OAT signal is real — wallets without it got tier 3 max. Adding to the alpha index.', likes: 48, validated: true },
-      { author: 'kelechi.eth', when: '1h', body: 'Pinning this. Heads up everyone: do NOT trust checker links from anywhere except the URL above. Two phishing copies already.', likes: 122, mod: true },
-      { author: 'ayo.web3', when: '38m', body: 'First time qualifying for anything 🧭 thank you for the breakdown.', likes: 14 },
-      { author: 'mosi_dao', when: '24m', body: 'How is the partner path working out for folks? Worth the gas to chase tier 1 or just take tier 3?', likes: 6 },
-      { author: 'degenscout', when: '12m', body: '@mosi_dao depends on your wallet — if you already have 8+ contracts you can hit tier 2 with ~$80 in fees. Math\'s in the doc I linked.', likes: 22 },
-    ],
-  },
-  {
-    id: 't2',
-    title: 'Senior Solidity engineer wanted — African remote, $90–140k, 2 retainer slots',
-    cat: 'earn',
-    tags: ['remote-job', 'solana', 'african-web3'],
-    author: 'compass.eth',
-    created: '2026-05-25T07:00:00Z',
-    lastActivity: '24m',
-    replies: 41,
-    views: 2680,
-    likes: 188,
-    participants: ['compass.eth', 'tinuke.builds', 'kweku.sol', 'kelechi.eth'],
-    bountySize: '$140,000',
-    body: `Direct from a Compass partner (Series A, on-chain rep system). Two retainer seats. Solidity + light Rust for cross-chain bits. Async, weekly sync on Thursdays.\n\nApply via the Skill Marketplace — applications routed through the form for the standard 7% facilitation.`,
-  },
-  {
-    id: 't3',
-    title: 'Voice of Impact — May winners + how to nominate for June',
-    cat: 'activities',
-    tags: ['governance', 'african-web3'],
-    author: 'fatima.lens',
-    created: '2026-05-24T16:30:00Z',
-    lastActivity: '1h',
-    replies: 27,
-    views: 1840,
-    likes: 96,
-    participants: ['fatima.lens', 'compass.eth', 'iyabo_nft'],
-    body: `Three contributors this month for going absurdly above and beyond in the community...`,
-  },
-  {
-    id: 't4',
-    title: '[News] Base announces 50M ecosystem fund — accepting builders from Africa & SEA',
-    cat: 'news',
-    tags: ['base', 'grant'],
-    author: 'signal_op',
-    created: '2026-05-25T05:42:00Z',
-    lastActivity: '3h',
-    replies: 56,
-    views: 3120,
-    likes: 201,
-    hot: true,
-    participants: ['signal_op', 'compass.eth', 'tinuke.builds', 'mosi_dao'],
-    body: 'Direct from Base — 50M ecosystem fund opens applications June 1. Geographic mandate: Africa, SEA, LATAM. Compass will host an AMA with the Base BD team next Tuesday.',
-  },
-  {
-    id: 't5',
-    title: 'Lagos Web3 Week — June 12–15 — submit side events by Wednesday',
-    cat: 'events',
-    tags: ['african-web3', 'hackathon'],
-    author: 'kelechi.eth',
-    created: '2026-05-24T11:10:00Z',
-    lastActivity: '5h',
-    replies: 38,
-    views: 2210,
-    likes: 142,
-    participants: ['kelechi.eth', 'compass.eth', 'nana_btc'],
-    body: 'Side event submission window closes Wednesday. Hosts get 3 featured slots + cross-promo across Compass channels.',
-  },
-  {
-    id: 't6',
-    title: 'New course: ZK Fundamentals — 6 weeks, on-chain certificate, $89',
-    cat: 'training',
-    tags: ['zk', 'beginner'],
-    author: 'compass.eth',
-    created: '2026-05-23T09:00:00Z',
-    lastActivity: '7h',
-    replies: 19,
-    views: 1480,
-    likes: 88,
-    participants: ['compass.eth', 'kweku.sol', 'tinuke.builds'],
-    body: 'Live cohort starts June 3. Free Telegram syllabus first; paid recordings + certificate on completion. Early bird 30% for the first 50.',
-  },
-  {
-    id: 't7',
-    title: 'Auditor available — 4 years, Spearbit + Code4rena top 50, $4k/week',
-    cat: 'skills',
-    tags: ['audit', 'remote-job'],
-    author: 'tinuke.builds',
-    created: '2026-05-24T19:20:00Z',
-    lastActivity: '6h',
-    replies: 23,
-    views: 1320,
-    likes: 71,
-    participants: ['tinuke.builds', 'kelechi.eth', '0xforesight'],
-    body: 'Wrapping up a Q3 engagement late June. Looking for one anchor client + spot reviews.',
-  },
-  {
-    id: 't8',
-    title: 'Brand partnership: Polygon × Compass — 6-month creator program brief',
-    cat: 'partnership',
-    tags: ['grant'],
-    author: 'compass.eth',
-    created: '2026-05-23T14:00:00Z',
-    lastActivity: '9h',
-    replies: 14,
-    views: 980,
-    likes: 62,
-    participants: ['compass.eth', 'fatima.lens'],
-    body: 'Polygon × Compass — 6 month creator program. 30 selected creators, monthly $400 retainer, content templates, distribution. Applications opening June 5.',
-  },
-  {
-    id: 't9',
-    title: 'Daily check-in 🧭 — Sunday May 25',
-    cat: 'news',
-    tags: [],
-    author: 'compass.eth',
-    created: '2026-05-25T06:00:00Z',
-    lastActivity: '18m',
-    replies: 142,
-    views: 1810,
-    likes: 49,
-    participants: ['compass.eth', 'ayo.web3', 'nana_btc', 'iyabo_nft', 'mosi_dao'],
-    body: 'GM 🧭 — what are you watching today? Drop your one chart, one read, one ship.',
-  },
-  {
-    id: 't10',
-    title: 'Bounty: write a 1500-word breakdown of Hyperliquid mechanics — $300',
-    cat: 'earn',
-    tags: ['bounty', 'defi'],
-    author: 'signal_op',
-    created: '2026-05-24T20:45:00Z',
-    lastActivity: '11h',
-    replies: 9,
-    views: 620,
-    likes: 33,
-    participants: ['signal_op', 'fatima.lens'],
-    body: '1500 words, our editorial guidelines apply. Top submission gets the bounty + featured publication.',
-  },
-  {
-    id: 't11',
-    title: 'Alpha: undisclosed L2 testnet — quest set drops Tuesday (tier-gated)',
-    cat: 'alpha',
-    tags: ['airdrops'],
-    author: '0xforesight',
-    created: '2026-05-25T04:00:00Z',
-    lastActivity: '4h',
-    replies: 67,
-    views: 2810,
-    likes: 224,
-    locked: 'Navigator',
-    participants: ['0xforesight', 'degenscout', 'kelechi.eth'],
-    body: '[Locked — Navigator tier and above. Validated alpha drops here first.]',
-  },
-  {
-    id: 't12',
-    title: 'Workshop recap: Account abstraction in production (Tuesday)',
-    cat: 'training',
-    tags: ['beginner'],
-    author: 'kweku.sol',
-    created: '2026-05-22T15:00:00Z',
-    lastActivity: '1d',
-    replies: 11,
-    views: 540,
-    likes: 28,
-    participants: ['kweku.sol', 'tinuke.builds'],
-    body: 'Slides + recording inside. Live attendance was 312 — biggest workshop yet.',
-  },
-];
+const TOPICS = [];
 
-const TRENDING_TAGS = [
-  { tag: 'airdrops', count: 142 },
-  { tag: 'monad', count: 98 },
-  { tag: 'base', count: 71 },
-  { tag: 'african-web3', count: 64 },
-  { tag: 'bounty', count: 52 },
-  { tag: 'remote-job', count: 41 },
-];
+const TRENDING_TAGS = [];
 
-const EVENTS_UPCOMING = [
-  { title: 'Lagos Web3 Week', date: 'Jun 12–15', loc: 'Lagos, NG', kind: 'IRL' },
-  { title: 'AMA: Base ecosystem fund', date: 'Tue 7pm WAT', loc: 'Discord stage', kind: 'Live' },
-  { title: 'ZK Fundamentals cohort', date: 'Jun 3', loc: 'Online', kind: 'Course' },
-];
+const EVENTS_UPCOMING = [];
 
 // Online members — long, varied avatar strip (just letter + hue)
-const ONLINE_MEMBERS = [
-  { avatar: 'K', hue: 25 },   { avatar: 'A', hue: 50 },   { avatar: '0', hue: 145 },
-  { avatar: 'T', hue: 290 },  { avatar: 'M', hue: 215 },  { avatar: 'S', hue: 195 },
-  { avatar: 'F', hue: 85 },   { avatar: 'N', hue: 18 },   { avatar: 'I', hue: 305 },
-  { avatar: 'K', hue: 110 },  { avatar: 'C', hue: 65 },   { avatar: 'A', hue: 340 },
-  { avatar: 'R', hue: 240 },  { avatar: 'L', hue: 165 },  { avatar: 'B', hue: 35 },
-  { avatar: 'D', hue: 125 },  { avatar: 'Z', hue: 280 },  { avatar: 'H', hue: 5 },
-  { avatar: 'O', hue: 75 },   { avatar: 'P', hue: 200 },  { avatar: 'Y', hue: 330 },
-  { avatar: 'W', hue: 155 },  { avatar: 'E', hue: 95 },   { avatar: 'J', hue: 250 },
-];
+const ONLINE_MEMBERS = [];
 
 // ===== Notifications =====
-const NOTIFICATIONS = [
-  { id: 'n1', kind: 'mention',  who: 'degenscout',   when: '12m', text: 'mentioned you in', target: 'Monad mainnet airdrop checker is live', unread: true },
-  { id: 'n2', kind: 'like',     who: '0xforesight',  when: '38m', text: 'liked your reply on', target: 'Lagos Web3 Week side events', unread: true },
-  { id: 'n3', kind: 'follow',   who: 'tinuke.builds', when: '1h', text: 'started following you', unread: true },
-  { id: 'n4', kind: 'validated', who: 'compass.eth', when: '2h', text: 'validated your alpha post', target: 'Three Solana memecoins on the watchlist' },
-  { id: 'n5', kind: 'reply',    who: 'mosi_dao',     when: '3h', text: 'replied to', target: 'On-chain rep systems — panel' },
-  { id: 'n6', kind: 'bounty',   who: 'compass.eth',  when: '5h', text: 'opened a $300 bounty in your area', target: 'Hyperliquid mechanics breakdown' },
-  { id: 'n7', kind: 'message',  who: 'fatima.lens',  when: '8h', text: 'sent you a message', target: 'Hey Kelechi — about the Voice of Impact slot…' },
-  { id: 'n8', kind: 'kp',       who: null,           when: '1d', text: 'You earned', target: '+120 KP — moderator activity', unread: false },
-  { id: 'n9', kind: 'follow',   who: 'iyabo_nft',    when: '1d', text: 'started following you' },
-  { id: 'n10', kind: 'event',   who: null,           when: '2d', text: 'Reminder', target: 'Lagos Web3 Week is in 16 days' },
-];
+const NOTIFICATIONS = [];
 
 // ===== Conversations (DMs) =====
-const CONVERSATIONS = [
-  {
-    id: 'dm1', with: 'fatima.lens', unread: 2, lastWhen: '4m',
-    last: 'Hey — about the Voice of Impact slot for June, can we sync?',
-    messages: [
-      { from: 'fatima.lens', when: 'Yesterday 6:42 PM', body: 'Hey Kelechi — was hoping to chat about the Voice of Impact panel for June.' },
-      { from: 'fatima.lens', when: 'Yesterday 6:43 PM', body: 'I think you would be a great anchor for the African Web3 segment.' },
-      { from: 'kelechi.eth', when: 'Yesterday 9:15 PM', body: 'Love that — what is the time commitment?' },
-      { from: 'fatima.lens', when: 'Today 11:02 AM', body: 'One 45-min prep call + 90 mins live. Two segments solo, one as moderator.' },
-      { from: 'fatima.lens', when: 'Today 11:04 AM', body: 'I can send you the brief if you want to take a look.' },
-      { from: 'kelechi.eth', when: 'Today 11:30 AM', body: 'Yes please. I am in.' },
-      { from: 'fatima.lens', when: 'just now', body: 'Sending now 🧭' },
-    ],
-  },
-  {
-    id: 'dm2', with: 'degenscout', unread: 0, lastWhen: '1h',
-    last: 'Cool — added you to the alpha index Telegram.',
-    messages: [
-      { from: 'kelechi.eth', when: '2h', body: 'Saw your Monad post — solid breakdown.' },
-      { from: 'degenscout', when: '1h', body: 'Cool — added you to the alpha index Telegram.' },
-    ],
-  },
-  {
-    id: 'dm3', with: '0xforesight', unread: 0, lastWhen: '5h',
-    last: 'I will validate before Tuesday and post the addendum.',
-    messages: [
-      { from: '0xforesight', when: 'Yesterday', body: 'Sending the L2 alpha later today — Navigator gated as usual.' },
-      { from: '0xforesight', when: '5h', body: 'I will validate before Tuesday and post the addendum.' },
-    ],
-  },
-  {
-    id: 'dm4', with: 'tinuke.builds', unread: 1, lastWhen: '6h',
-    last: 'Quick question about the auditor listing — open?',
-    messages: [
-      { from: 'tinuke.builds', when: '6h', body: 'Quick question about the auditor listing — open?' },
-    ],
-  },
-  {
-    id: 'dm5', with: 'compass.eth', unread: 0, lastWhen: '1d',
-    last: 'Congrats on the Captain promo — well earned.',
-    messages: [
-      { from: 'compass.eth', when: '1d', body: 'Congrats on the Captain promo — well earned.' },
-    ],
-  },
-  {
-    id: 'dm6', with: 'mosi_dao', unread: 0, lastWhen: '2d',
-    last: 'Are you running the retroPGF panel?',
-    messages: [
-      { from: 'mosi_dao', when: '2d', body: 'Are you running the retroPGF panel?' },
-    ],
-  },
-];
+const CONVERSATIONS = [];
 
 // ===== Talent Marketplace =====
-const TALENT = [
+const TALENT_KEY = 'compass_talent_v1';
+const TALENT_KEY_APPROVED = 'compass_approved_talents_v1';
+const TALENT = [];
+const TALENT_SKILLS = [ 'All', 'Auditing', 'Engineering', 'Design', 'Content', 'Development', 'Governance', 'Video', 'Marketing', 'Research' ];
+
+const readApprovedTalents = () => {
+  try { return JSON.parse(localStorage.getItem(TALENT_KEY_APPROVED) || '[]'); }
+  catch { return []; }
+};
+
+const writeApprovedTalents = (list) => {
+  try { localStorage.setItem(TALENT_KEY_APPROVED, JSON.stringify(list)); }
+  catch {}
+};
+
+const talentTemplate = [
   {
-    id: 't-aud-1', kind: 'gig',
-    title: 'I will audit your Solidity contract in 5 days',
-    skill: 'Smart Contract Audit',
-    author: 'tinuke.builds',
-    rating: 5.0, reviews: 87, delivery: '5 days', price: 1800,
-    tags: ['solidity', 'audit', 'foundry'],
-    bgHue: 290,
-    featured: true,
+    id: 't-aud-1', author: 'amara', skill: 'Auditing', role: 'Smart Contract Auditor',
+    title: 'I will audit your Solidity and Rust smart contracts',
+    bio: 'Thorough manual + tool-assisted audits for DeFi protocols. 6 years, 50+ protocols, zero post-audit exploits.',
+    tags: ['Solidity', 'DeFi', 'Security'],
+    rating: 4.9, reviews: 47, projects: 120, successRate: 98,
+    price: 500, cardBg: '#f5f3ff', bgHue: 260,
+    featured: true, topRated: true, approved: true,
+    description: `I offer comprehensive smart contract audits for DeFi protocols, NFT marketplaces, and cross-chain bridges.\n\n• Manual code review by lead auditor\n• Automated slither/mythril/echidna analysis\n• Detailed findings report with severity ratings\n• One free re-audit after fixes`,
+    packages: [
+      { id: 'basic',    name: 'Basic',    priceMul: 0.6, desc: 'Quick assessment for small contracts (< 500 LOC).', features: ['Manual review', 'Automated analysis', 'Summary report', '1 re-audit round'], delivery: '3 days', revisions: '1 revision', popular: false },
+      { id: 'standard', name: 'Standard', priceMul: 1.0, desc: 'Full audit for production contracts (< 3000 LOC).', features: ['Manual review', 'Automated analysis', 'Detailed report with severity', 'Remediation guidance', '2 re-audit rounds'], delivery: '7 days', revisions: '2 revisions', popular: true },
+      { id: 'premium',  name: 'Premium',  priceMul: 1.8, desc: 'Deep-dive with fuzzing + formal verification.', features: ['Everything in Standard', 'Fuzzing with Echidna', 'Formal verification (Certora)', 'Priority support', 'Post-deploy monitoring 30d'], delivery: '14 days', revisions: '3 revisions', popular: false },
+    ],
+    reviewList: [
+      { who: 'felix', when: '2 weeks ago', rating: 5, body: 'Amara caught a critical reentrancy bug our team missed. Saved us from a major incident. Highly recommend.' },
+      { who: 'testuser', when: '1 month ago', rating: 5, body: 'Thorough and fast. The report was well-structured with clear remediation steps.' },
+    ],
   },
   {
-    id: 't-eng-1', kind: 'gig',
-    title: 'Senior Solidity engineer for retainer or sprint',
-    skill: 'Solidity Engineering',
-    author: '0xforesight',
-    rating: 4.9, reviews: 64, delivery: 'Negotiable', price: 4000,
-    tags: ['solidity', 'rust', 'security'],
-    bgHue: 145,
+    id: 't-eng-1', author: 'felix', skill: 'Engineering', role: 'Blockchain Engineer',
+    title: 'I will build your dApp from idea to mainnet',
+    bio: 'Full-stack blockchain developer. Solana, EVM, Rust, TypeScript, React. I ship production dApps fast.',
+    tags: ['Rust', 'React', 'TypeScript'],
+    rating: 4.8, reviews: 38, projects: 85, successRate: 96,
+    price: 800, cardBg: '#ecfdf5', bgHue: 150,
+    featured: true, topRated: false, approved: true,
+    description: `Full-cycle dApp development — from architecture design to mainnet deployment and post-launch support.\n\n• Smart contract development (Solidity / Rust)\n• Frontend with React + wagmi / rainbow kit\n• Subgraph indexing with The Graph\n• Deployment scripts + CI/CD`,
+    packages: [
+      { id: 'basic',    name: 'Basic',    priceMul: 0.5, desc: 'MVP with one smart contract + basic frontend.', features: ['1 smart contract (ERC-20/721)', 'Simple React frontend', 'Local deploy', 'Brief docs'], delivery: '10 days', revisions: '2 revisions', popular: false },
+      { id: 'standard', name: 'Standard', priceMul: 1.0, desc: 'Production dApp with full frontend + tests.', features: ['2-3 smart contracts', 'Production React UI', 'Unit + integration tests', 'Goerli testnet deploy', 'Deployment guide'], delivery: '21 days', revisions: '3 revisions', popular: true },
+      { id: 'premium',  name: 'Premium',  priceMul: 1.7, desc: 'Full mainnet launch + subgraph + monitoring.', features: ['Everything in Standard', 'The Graph subgraph', 'Mainnet deploy', 'Post-launch monitoring 2w', 'Performance optimization'], delivery: '30 days', revisions: '4 revisions', popular: false },
+    ],
+    reviewList: [],
   },
   {
-    id: 't-des-1', kind: 'gig',
-    title: 'Brand identity + design system for Web3 startups',
-    skill: 'Design',
-    author: 'iyabo_nft',
-    rating: 4.9, reviews: 42, delivery: '10 days', price: 2400,
-    tags: ['brand', 'figma', 'design-system'],
-    bgHue: 340,
+    id: 't-des-1', author: 'zara', skill: 'Design', role: 'Motion & Brand Designer',
+    title: 'I will design your Web3 brand identity and motion assets',
+    bio: 'Brand identity, motion design, and UI for crypto projects. From logos to full visual systems.',
+    tags: ['UI/UX', 'Figma', 'Motion'],
+    rating: 5.0, reviews: 22, projects: 45, successRate: 100,
+    price: 350, cardBg: '#fdf2f8', bgHue: 340,
+    featured: true, topRated: true, approved: true,
+    description: `Complete brand design for Web3 projects — logos, colour systems, motion sequences, and product UI.\n\n• Brand strategy & moodboards\n• Logo + full identity system\n• Motion sequences (Lottie / MP4)\n• Figma UI kit for your dApp`,
+    packages: [
+      { id: 'basic',    name: 'Basic',    priceMul: 0.5, desc: 'Logo + colour palette + typography guide.', features: ['3 logo concepts', 'Colour palette', 'Typography guide', 'Source files'], delivery: '5 days', revisions: '2 revisions', popular: false },
+      { id: 'standard', name: 'Standard', priceMul: 1.0, desc: 'Full identity: logo, brand guide, social kit, basic motion.', features: ['Everything in Basic', 'Full brand guide PDF', 'Social media kit', '1 animated Lottie asset'], delivery: '10 days', revisions: '3 revisions', popular: true },
+      { id: 'premium',  name: 'Premium',  priceMul: 1.8, desc: 'Complete brand + UI kit + multi-scene motion pack.', features: ['Everything in Standard', 'Figma UI kit (20+ screens)', '5 animated Lottie assets', 'Brand video intro (15s)'], delivery: '21 days', revisions: '4 revisions', popular: false },
+    ],
+    reviewList: [],
   },
   {
-    id: 't-cnt-1', kind: 'gig',
-    title: 'Long-form Web3 content & ghost-writing',
-    skill: 'Content',
-    author: 'fatima.lens',
-    rating: 5.0, reviews: 28, delivery: '7 days', price: 950,
-    tags: ['writing', 'editorial', 'lens'],
-    bgHue: 85,
+    id: 't-cnt-1', author: 'testuser', skill: 'Content', role: 'Web3 Content Strategist',
+    title: 'I will write and distribute your Web3 content strategy',
+    bio: 'Content that drives adoption. I write threads, articles, and newsletters for crypto projects.',
+    tags: ['Web3', 'Content', 'Growth'],
+    rating: 4.7, reviews: 31, projects: 62, successRate: 94,
+    price: 200, cardBg: '#fefce8', bgHue: 50,
+    featured: false, topRated: false, approved: true,
+    description: `End-to-end content strategy for Web3 protocols, DAOs, and NFT projects.\n\n• Twitter thread writing (10+ threads/month)\n• Long-form articles for Mirror / Medium\n• Newsletter content and automation\n• SEO-optimised blog posts`,
+    packages: [
+      { id: 'basic',    name: 'Basic',    priceMul: 0.5, desc: '5 Twitter threads + 1 article per week.', features: ['5 threads/week', '1 article/week', 'Content calendar', 'Basic analytics'], delivery: '7 days', revisions: '2 revisions', popular: false },
+      { id: 'standard', name: 'Standard', priceMul: 1.0, desc: '10 threads + 2 articles + newsletter setup.', features: ['10 threads/week', '2 articles/week', 'Newsletter setup', 'SEO optimisation', 'Growth tips'], delivery: '7 days', revisions: '3 revisions', popular: true },
+      { id: 'premium',  name: 'Premium',  priceMul: 1.7, desc: 'Full content machine + distribution + PR.', features: ['Everything in Standard', 'PR outreach (5 outlets)', 'Social media management', 'Performance report', '24/7 Slack'], delivery: '7 days', revisions: '4 revisions', popular: false },
+    ],
+    reviewList: [],
   },
   {
-    id: 't-dev-1', kind: 'gig',
-    title: 'Production-grade frontend for your dapp',
-    skill: 'Frontend Engineering',
-    author: 'kweku.sol',
-    rating: 4.8, reviews: 35, delivery: '12 days', price: 2200,
-    tags: ['next.js', 'wagmi', 'tailwind'],
-    bgHue: 110,
+    id: 't-gov-1', author: 'testuser', skill: 'Governance', role: 'DAO Governance Lead',
+    title: 'I will set up and run your DAO governance system',
+    bio: 'Governance design, proposal drafting, and community voting infrastructure.',
+    tags: ['Community', 'Discord', 'Farcaster'],
+    rating: 4.6, reviews: 18, projects: 30, successRate: 92,
+    price: 600, cardBg: '#eff6ff', bgHue: 215,
+    featured: false, topRated: false, approved: true,
+    description: `Full governance stack for DAOs — from constitution drafting to Snapshot setup and proposal management.\n\n• Governance framework design\n• Snapshot / Tally space setup\n• Proposal drafting and management\n• Community voting coordination`,
+    packages: [
+      { id: 'basic',    name: 'Basic',    priceMul: 0.5, desc: 'Governance framework + Snapshot setup.', features: ['Governance framework doc', 'Snapshot space setup', 'Voting strategy config', 'Setup guide'], delivery: '5 days', revisions: '1 revision', popular: false },
+      { id: 'standard', name: 'Standard', priceMul: 1.0, desc: 'Full governance + proposal management + 1 month support.', features: ['Everything in Basic', 'Proposal templates', 'Community onboarding', '1 month proposal support'], delivery: '10 days', revisions: '2 revisions', popular: true },
+    ],
+    reviewList: [],
   },
   {
-    id: 't-gov-1', kind: 'gig',
-    title: 'DAO governance setup — from scratch to launch',
-    skill: 'Governance',
-    author: 'mosi_dao',
-    rating: 4.9, reviews: 19, delivery: '21 days', price: 3200,
-    tags: ['governance', 'snapshot', 'retroPGF'],
-    bgHue: 215,
+    id: 't-vid-1', author: 'zara', skill: 'Video', role: 'Web3 Video Producer',
+    title: 'I will produce your project explainer and demo videos',
+    bio: 'Product demos, explainer videos, and event recaps for Web3 projects. From script to final cut.',
+    tags: ['Video', 'Motion', 'Farcaster'],
+    rating: 4.9, reviews: 14, projects: 28, successRate: 97,
+    price: 450, cardBg: '#fff7ed', bgHue: 25,
+    featured: false, topRated: true, approved: true,
+    description: `Professional video production for Web3: product demos, explainer animations, and conference recaps.\n\n• Scriptwriting and storyboarding\n• Voiceover recording\n• Motion graphics and animation\n• Colour grading and sound design`,
+    packages: [
+      { id: 'basic',    name: 'Basic',    priceMul: 0.5, desc: '60s explainer video with stock assets.', features: ['Scriptwriting', 'Stock assets', 'Voiceover', '1 revision round'], delivery: '7 days', revisions: '1 revision', popular: false },
+      { id: 'standard', name: 'Standard', priceMul: 1.0, desc: '90s custom-animated explainer with original assets.', features: ['Everything in Basic', 'Custom animation', 'Original motion assets', 'Sound design', '2 revision rounds'], delivery: '14 days', revisions: '2 revisions', popular: true },
+    ],
+    reviewList: [],
   },
   {
-    id: 't-vid-1', kind: 'gig',
-    title: 'Cinematic 60-sec product video, on-chain ready',
-    skill: 'Video',
-    author: 'ayo.web3',
-    rating: 4.7, reviews: 12, delivery: '14 days', price: 1400,
-    tags: ['video', 'motion', 'after-effects'],
-    bgHue: 18,
+    id: 't-mkt-1', author: 'testuser', skill: 'Marketing', role: 'Web3 Growth Marketer',
+    title: 'I will grow your Web3 project community and reach',
+    bio: 'Growth marketing for crypto — community building, partnerships, and user acquisition.',
+    tags: ['Growth', 'Campaigns', 'SEO'],
+    rating: 4.5, reviews: 25, projects: 55, successRate: 88,
+    price: 300, cardBg: '#fef2f2', bgHue: 0,
+    featured: false, topRated: false, approved: true,
+    description: `Data-driven growth marketing for Web3: community growth, influencer partnerships, and campaign execution.\n\n• Community growth strategy\n• Influencer and partnership outreach\n• Ad campaign management\n• Analytics and reporting`,
+    packages: [
+      { id: 'basic',    name: 'Basic',    priceMul: 0.5, desc: 'Growth audit + 30-day action plan.', features: ['Growth audit', '30-day action plan', 'Competitor analysis', '1 check-in call'], delivery: '5 days', revisions: '1 revision', popular: false },
+      { id: 'standard', name: 'Standard', priceMul: 1.0, desc: 'Full growth campaign (30 days).', features: ['Campaign strategy', 'Influencer outreach (10)', 'Content calendar', 'Weekly reports', 'Ad campaign setup'], delivery: '30 days', revisions: '2 revisions', popular: true },
+    ],
+    reviewList: [],
   },
   {
-    id: 't-mkt-1', kind: 'gig',
-    title: 'Launch a token-aware growth engine in 2 weeks',
-    skill: 'Marketing',
-    author: 'nana_btc',
-    rating: 4.6, reviews: 21, delivery: '14 days', price: 1900,
-    tags: ['growth', 'campaigns', 'farcaster'],
-    bgHue: 5,
-  },
-  {
-    id: 't-rsh-1', kind: 'gig',
-    title: 'Deep ecosystem research reports (10-30 pages)',
-    skill: 'Research',
-    author: 'signal_op',
-    rating: 5.0, reviews: 16, delivery: '10 days', price: 2700,
-    tags: ['research', 'data', 'analysis'],
-    bgHue: 195,
+    id: 't-rsh-1', author: 'felix', skill: 'Research', role: 'Crypto Research Analyst',
+    title: 'I will research and write in-depth protocol reports',
+    bio: 'Deep-dive research on DeFi protocols, L1/L2 ecosystems, and tokenomics.',
+    tags: ['Research', 'Data', 'DeFi'],
+    rating: 4.8, reviews: 33, projects: 70, successRate: 95,
+    price: 400, cardBg: '#ecfeff', bgHue: 185,
+    featured: true, topRated: false, approved: true,
+    description: `Institutional-grade research reports for DeFi protocols, L1/L2 ecosystems, and tokenomics analysis.\n\n• Protocol deep-dive (tech, team, tokenomics)\n• Competitive landscape analysis\n• Risk assessment and scoring\n• Investment memo quality output`,
+    packages: [
+      { id: 'basic',    name: 'Basic',    priceMul: 0.5, desc: 'Protocol overview report (5-10 pages).', features: ['Executive summary', 'Tech overview', 'Tokenomics analysis', 'PDF delivery'], delivery: '7 days', revisions: '1 revision', popular: false },
+      { id: 'standard', name: 'Standard', priceMul: 1.0, desc: 'Full research report (20-30 pages) with competitive analysis.', features: ['Everything in Basic', 'Competitive landscape', 'Risk assessment', 'Data visualisations', 'Raw data export'], delivery: '14 days', revisions: '2 revisions', popular: true },
+    ],
+    reviewList: [],
   },
 ];
 
-const TALENT_SKILLS = [
-  'All', 'Smart Contract Audit', 'Solidity Engineering', 'Frontend Engineering',
-  'Design', 'Content', 'Marketing', 'Governance', 'Video', 'Research',
-];
+const talentService = {
+  _key: TALENT_KEY,
+
+  async init() {
+    try {
+      const raw = localStorage.getItem(this._key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        TALENT.length = 0;
+        TALENT.push(...parsed);
+        return parsed;
+      }
+    } catch {}
+    const seed = talentTemplate.map(g => ({ ...g, packages: g.packages.map(p => ({ ...p })) }));
+    TALENT.length = 0;
+    TALENT.push(...seed);
+    this._persist();
+    return seed;
+  },
+
+  _persist() {
+    try { localStorage.setItem(this._key, JSON.stringify(TALENT)); } catch {}
+  },
+
+  async list(currentUser) {
+    let list = [...TALENT];
+    if (!this._isAdmin(currentUser)) {
+      list = list.filter(t => t.approved);
+    }
+    return list;
+  },
+
+  async get(id) { return TALENT.find(t => t.id === id) || null; },
+
+  _isAdmin(u) { return u && (u.role === 'admin' || u.role === 'mod'); },
+  _canCreate(u) {
+    if (!u) return false;
+    if (this._isAdmin(u)) return true;
+    return readApprovedTalents().includes(u.handle);
+  },
+  _canUpdate(gig, u) { return u && (this._isAdmin(u) || u.handle === gig.author); },
+  _canDelete(u) { return this._isAdmin(u); },
+
+  async create(data, currentUser) {
+    if (!this._canCreate(currentUser)) {
+      const approved = readApprovedTalents();
+      if (approved.includes(currentUser.handle)) throw new Error('Your talent account is approved. You can post gigs.');
+      throw new Error('Only approved talents, admins, and moderators can list gigs.');
+    }
+    if (!data.id) data.id = 't-' + Date.now().toString(36);
+    if (!data.packages) data.packages = [];
+    if (!data.reviewList) data.reviewList = [];
+    if (this._isAdmin(currentUser)) {
+      data.approved = true;
+    } else {
+      data.approved = true;
+    }
+    TALENT.push(data);
+    this._persist();
+    return data;
+  },
+
+  async update(id, changes, currentUser) {
+    const gig = TALENT.find(t => t.id === id);
+    if (!gig) throw new Error('Gig not found.');
+    if (!this._canUpdate(gig, currentUser)) throw new Error('Only the talent, admins, and moderators can edit this gig.');
+    Object.assign(gig, changes);
+    this._persist();
+    return gig;
+  },
+
+  async delete(id, currentUser) {
+    const idx = TALENT.findIndex(t => t.id === id);
+    if (idx === -1) throw new Error('Gig not found.');
+    if (!this._canDelete(currentUser)) throw new Error('Only admins and moderators can delete gigs.');
+    TALENT.splice(idx, 1);
+    this._persist();
+    return true;
+  },
+
+  async setFeatured(id, on, currentUser) {
+    if (!this._isAdmin(currentUser)) throw new Error('Only admins and moderators can set featured status.');
+    const gig = TALENT.find(t => t.id === id);
+    if (!gig) throw new Error('Gig not found.');
+    gig.featured = !!on;
+    this._persist();
+    return gig;
+  },
+
+  async approveTalent(handle, currentUser) {
+    if (!this._isAdmin(currentUser)) throw new Error('Only admins and moderators can approve talents.');
+    const approved = readApprovedTalents();
+    if (!approved.includes(handle)) {
+      approved.push(handle);
+      writeApprovedTalents(approved);
+    }
+    return approved;
+  },
+
+  async revokeTalent(handle, currentUser) {
+    if (!this._isAdmin(currentUser)) throw new Error('Only admins and moderators can revoke talent status.');
+    const approved = readApprovedTalents().filter(h => h !== handle);
+    writeApprovedTalents(approved);
+    return approved;
+  },
+
+  async getApprovedTalents() {
+    return readApprovedTalents();
+  },
+
+  async isTalentApproved(handle) {
+    return readApprovedTalents().includes(handle);
+  },
+};
+
+talentService.init();
 
 // (Notifications/Conversations/Talent are declared above this; CONTENT_ITEMS below.
 // All globals are exported in a single Object.assign at the bottom of this file.)
 
 // Content / editorial pieces — dark cards like Arc's "Partner Spotlight" tiles
-const CONTENT_ITEMS = [
-  {
-    id: 'c1',
-    kind: 'Partner Spotlight',
-    title: 'Stablecoins are the rails — here is what African builders are shipping on them.',
-    subtitle: 'A deep look at the stablecoin infrastructure layer and the builders actively shipping on top of it across emerging markets.',
-    author: 'compass.eth',
-    when: 'May 24',
-    minutes: 6,
-    bg: 'navy',
-  },
-  {
-    id: 'c2',
-    kind: 'Compass House',
-    title: 'Builder feedback survey — what does the next quarter of Compass need to be?',
-    author: 'fatima.lens',
-    when: 'May 22',
-    minutes: 3,
-    bg: 'royal',
-  },
-  {
-    id: 'c3',
-    kind: 'Research',
-    title: 'Scaling institutional DeFi: how three African desks are routing $40M / month.',
-    author: 'signal_op',
-    when: 'May 20',
-    minutes: 11,
-    bg: 'midnight',
-  },
-  {
-    id: 'c4',
-    kind: 'Voice of Impact',
-    title: 'Three contributors who changed someone\'s on-chain trajectory this month.',
-    author: 'fatima.lens',
-    when: 'May 18',
-    minutes: 4,
-    bg: 'plum',
-  },
-  {
-    id: 'c5',
-    kind: 'Field Note',
-    title: 'Nairobi → Lagos: ground report from two weeks of builder meetups.',
-    author: 'degenscout',
-    when: 'May 16',
-    minutes: 7,
-    bg: 'forest',
-  },
-  {
-    id: 'c6',
-    kind: 'Tutorial',
-    title: 'Account abstraction in production — the AA primer that should\'ve existed in 2024.',
-    author: 'kweku.sol',
-    when: 'May 14',
-    minutes: 14,
-    bg: 'navy',
-  },
-];
+const CONTENT_ITEMS = [];
 
 // ===== Members directory (separate from USERS — includes more people + extras) =====
 // Each entry has: name, handle, role, company, loc, region, sectors, online, photo, isMe
-const REGIONS = [
-  { id: 'na',     label: 'North America' },
-  { id: 'latam',  label: 'Latin America (LATAM)' },
-  { id: 'eu',     label: 'Europe' },
-  { id: 'mea',    label: 'Middle East or Africa' },
-  { id: 'apac',   label: 'Asia–Pacific, Australia, New Zealand (APAC)' },
-];
+const REGIONS = [];
 
-const SECTORS = [
-  'DeFi', 'Borrowing and Lending', 'RWA', 'Privacy', 'Agentic Commerce',
-  'Stablecoins', 'NFTs', 'Infrastructure', 'Gaming', 'Identity',
-];
+const SECTORS = [];
 
-const MEMBERS = [
-  { handle: 'kelechi.eth',  name: 'Kelechi Okeke',  role: 'Captain @ Compass',          loc: 'Lagos, Nigeria',      region: 'mea',  sectors: ['DeFi','Infrastructure','Stablecoins'], online: true,  avatar: 'K', hue: 25, isMe: true },
-  { handle: 'oxwuy',        name: 'Ox Wuy',         role: 'Blockchain Builder, Onchain Contributor @ Independent Builder, Web3 Contributor', loc: 'Hanoi, Vietnam', region: 'apac', sectors: ['Infrastructure','Privacy'], online: true,  avatar: 'O', hue: 110 },
-  { handle: 'lina_3_1',     name: '3.1 3.1',        role: '3.1 @ 3.1',                  loc: 'Chur, Switzerland',   region: 'eu',   sectors: ['DeFi'], online: true,  avatar: '3', hue: 200 },
-  { handle: 'gina_3_2',     name: '3.2 3.2',        role: '3.2 @ 3.2',                  loc: 'Cassino, Italy',      region: 'eu',   sectors: ['Stablecoins'], online: true,  avatar: '3', hue: 340 },
-  { handle: 'ravi_3_3',     name: '3.3 3.3',        role: '3.3 @ 3.3',                  loc: 'Durgauti, India',     region: 'apac', sectors: ['Infrastructure'], online: true,  avatar: '3', hue: 50 },
-  { handle: 'ihsan_3_4',    name: '3.4 3.4',        role: '3.4 @ 3.4',                  loc: 'Istanbul, Turkey',    region: 'mea',  sectors: ['Identity'], online: true,  avatar: '3', hue: 18 },
-  { handle: 'bemba_3_5',    name: '3.5 3.5',        role: '3.5 @ 3.5',                  loc: 'Ewo, Congo (Brazzaville)', region: 'mea', sectors: ['DeFi','RWA'], online: true,  avatar: '3', hue: 145 },
-  { handle: 'aini_lu',      name: 'AINI lu',        role: 'Manager @ Hengyi Petrochemical Co., Ltd.', loc: 'Yichang Shequ, China', region: 'apac', sectors: ['RWA'], online: true,  avatar: 'A', hue: 290 },
-  { handle: 'alvin_moi',    name: 'ALVIN Moi',      role: 'software developer @ moicw', loc: 'Kuala Lumpur, Malaysia', region: 'apac', sectors: ['Infrastructure','Gaming'], online: true,  avatar: 'A', hue: 250 },
-  { handle: 'arra_ganesh',  name: 'ARRA GANESH',    role: 'Insurance Agent @ policybazaar.com', loc: 'Indi, India',  region: 'apac', sectors: ['RWA','Stablecoins'], online: true,  avatar: 'A', hue: 195, photo: true },
-  { handle: 'aaron_m',      name: 'Aaron Mendoza',  role: 'QA @ Lazada Philippines',    loc: 'Quezon City, Philippines', region: 'apac', sectors: ['Infrastructure'], online: true,  avatar: 'A', hue: 215, photo: true },
-  { handle: 'adult_photo',  name: 'Adult Photo',    role: 'Data Scientist @ panictreedinosaur', loc: 'Ōsaka, Japan', region: 'apac', sectors: ['Agentic Commerce','NFTs'], online: true,  avatar: 'A', hue: 305, photo: true },
-  { handle: 'rivka_solo',   name: 'Rivka Solomon',  role: 'Founder @ Mesh Labs',        loc: 'Tel Aviv, Israel',    region: 'mea',  sectors: ['DeFi','Privacy'], online: true,  avatar: 'R', hue: 165 },
-  { handle: 'sofia_ar',     name: 'Sofia Arana',    role: 'BD @ Mantle',                loc: 'Mexico City, Mexico', region: 'latam', sectors: ['DeFi','NFTs'], online: false, avatar: 'S', hue: 18, photo: true },
-  { handle: 'jonas_klein',  name: 'Jonas Klein',    role: 'Protocol Eng @ Mythos',      loc: 'Berlin, Germany',     region: 'eu',   sectors: ['Gaming','NFTs'], online: true,  avatar: 'J', hue: 240 },
-  { handle: 'amelie_rost',  name: 'Amélie Rost',    role: 'Design Lead @ Ledger',       loc: 'Paris, France',       region: 'eu',   sectors: ['Identity'], online: true,  avatar: 'A', hue: 340, photo: true },
-  { handle: 'amaka_obi',    name: 'Amaka Obi',      role: 'Auditor @ Nethermind',       loc: 'Abuja, Nigeria',      region: 'mea',  sectors: ['DeFi','Borrowing and Lending','Privacy'], online: true,  avatar: 'A', hue: 35 },
-  { handle: 'priya_nat',    name: 'Priya Nataraj',  role: 'PM @ Polygon',               loc: 'Bangalore, India',    region: 'apac', sectors: ['Stablecoins','RWA'], online: true,  avatar: 'P', hue: 290 },
-  { handle: 'andre_l',      name: 'André L.',       role: 'Researcher @ Anchorage',     loc: 'Lisbon, Portugal',    region: 'eu',   sectors: ['RWA','Stablecoins'], online: false, avatar: 'A', hue: 125 },
-  { handle: 'sade_o',       name: 'Sade Olaniyan',  role: 'Founder @ Trove',            loc: 'Accra, Ghana',        region: 'mea',  sectors: ['Stablecoins','Agentic Commerce'], online: true,  avatar: 'S', hue: 5, photo: true },
-  { handle: 'mateo_ruz',    name: 'Mateo Ruz',      role: 'DevRel @ Lens',              loc: 'Buenos Aires, Argentina', region: 'latam', sectors: ['NFTs','Identity'], online: true,  avatar: 'M', hue: 75 },
-  { handle: 'naledi_z',     name: 'Naledi Zulu',    role: 'GM @ Africa Web3 Council',   loc: 'Johannesburg, South Africa', region: 'mea', sectors: ['DeFi','Infrastructure'], online: true,  avatar: 'N', hue: 145 },
-  { handle: 'lucas_par',    name: 'Lucas Parra',    role: 'CTO @ Quipu',                loc: 'Bogotá, Colombia',    region: 'latam', sectors: ['Infrastructure','Privacy'], online: false, avatar: 'L', hue: 215 },
-  { handle: 'ines_de_v',    name: 'Inés de Vega',   role: 'Product @ Worldcoin',        loc: 'Madrid, Spain',       region: 'eu',   sectors: ['Identity'], online: true,  avatar: 'I', hue: 305, photo: true },
-  { handle: 'jin_park',     name: 'Jin Park',       role: 'Eng @ Story Protocol',       loc: 'Seoul, South Korea',  region: 'apac', sectors: ['NFTs','Gaming'], online: false, avatar: 'J', hue: 195 },
-  { handle: 'omar_b',       name: 'Omar Boutaba',   role: 'Founder @ Stax',             loc: 'Casablanca, Morocco', region: 'mea',  sectors: ['Stablecoins','DeFi'], online: true,  avatar: 'O', hue: 50 },
-  { handle: 'mae_chen',     name: 'Mae Chen',       role: 'PM @ Polymarket',            loc: 'Singapore',           region: 'apac', sectors: ['DeFi','Agentic Commerce'], online: true,  avatar: 'M', hue: 165, photo: true },
-  { handle: 'kofi_a',       name: 'Kofi Asante',    role: 'Solidity Eng @ Status',      loc: 'Tema, Ghana',         region: 'mea',  sectors: ['Privacy','Infrastructure'], online: true,  avatar: 'K', hue: 280 },
-  { handle: 'sara_mes',     name: 'Sara Messina',   role: 'Auditor @ Trail of Bits',    loc: 'Rome, Italy',         region: 'eu',   sectors: ['DeFi','Privacy'], online: false, avatar: 'S', hue: 100 },
-  { handle: 'rafael_t',     name: 'Rafael Torres',  role: 'GM @ Mercado Bitcoin',       loc: 'São Paulo, Brazil',   region: 'latam', sectors: ['Stablecoins','DeFi'], online: true,  avatar: 'R', hue: 25 },
-];
+const MEMBERS = [];
 
 // ===== Conferences / Classes (admin + moderator hosted) =====
 const CAN_HOST_TIERS = ['Official', 'Captain'];
+const CAN_CREATE_ROLES = ['admin', 'mod'];
+const canCreateEvent = (user) => user && (CAN_CREATE_ROLES.includes(user.role) || CAN_HOST_TIERS.includes(user.tier));
+const genConfId = () => 'cls_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 
-const CONFERENCES = [
-  {
-    id: 'cf1',
-    title: 'ZK Fundamentals — Lesson 3: Circuits & Constraints',
-    desc: 'We build a real circuit from scratch, reason about constraint systems, and wire it into a verifier. Bring a laptop — this is hands-on.',
-    host: 'compass.eth',
-    cohosts: ['kweku.sol'],
-    cat: 'training',
-    status: 'live',
-    when: 'Live now',
-    durationMin: 90,
-    capacity: 200,
-    registered: 142,
-    attending: 88,
-    recorded: true,
-    cover: 195,
-    lessonOf: 'ZK Fundamentals cohort',
+const CONFERENCES = [];
+
+const conferenceService = {
+  _key: 'compass_conferences_v1',
+
+  async init() {
+    try {
+      const raw = localStorage.getItem(this._key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        CONFERENCES.length = 0;
+        CONFERENCES.push(...parsed);
+      }
+    } catch {}
+    return CONFERENCES;
   },
-  {
-    id: 'cf2',
-    title: 'Smart-contract security clinic: reading an audit report',
-    desc: 'Live walkthrough of two real audit reports. How to triage severity, reproduce findings in Foundry, and brief your investors.',
-    host: 'kelechi.eth',
-    cohosts: ['tinuke.builds'],
-    cat: 'skills',
-    status: 'scheduled',
-    when: 'Tomorrow · 6:00 PM WAT',
-    startsInMin: 1320,
-    durationMin: 60,
-    capacity: 150,
-    registered: 96,
-    recorded: true,
-    cover: 290,
+
+  _persist() {
+    try { localStorage.setItem(this._key, JSON.stringify(CONFERENCES)); } catch {}
   },
-  {
-    id: 'cf3',
-    title: 'Stablecoin rails masterclass — building an African off-ramp',
-    desc: 'From KYC to settlement. The architecture, the partners, the regulatory traps. With a live Q&A.',
-    host: 'compass.eth',
-    cohosts: ['fatima.lens'],
-    cat: 'training',
-    status: 'scheduled',
-    when: 'Jun 3 · 5:00 PM WAT',
-    startsInMin: 8640,
-    durationMin: 75,
-    capacity: 300,
-    registered: 214,
-    recorded: true,
-    cover: 145,
+
+  async list() { return [...CONFERENCES]; },
+
+  async get(id) { return CONFERENCES.find(c => c.id === id) || null; },
+
+  async create(cls) {
+    CONFERENCES.push(cls);
+    this._persist();
+    return cls;
   },
-  {
-    id: 'cf4',
-    title: 'Account Abstraction in production (recording)',
-    desc: 'The full recorded class on shipping AA wallets — paymasters, bundlers, and the gotchas nobody warns you about.',
-    host: 'kweku.sol',
-    cohosts: [],
-    cat: 'training',
-    status: 'ended',
-    when: 'May 22',
-    durationMin: 64,
-    capacity: 200,
-    registered: 312,
-    attended: 287,
-    recorded: true,
-    replay: true,
-    cover: 290,
+
+  async update(id, changes) {
+    const idx = CONFERENCES.findIndex(c => c.id === id);
+    if (idx === -1) return null;
+    Object.assign(CONFERENCES[idx], changes);
+    this._persist();
+    return CONFERENCES[idx];
   },
-];
+
+  async delete(id) {
+    const idx = CONFERENCES.findIndex(c => c.id === id);
+    if (idx === -1) return false;
+    CONFERENCES.splice(idx, 1);
+    this._persist();
+    return true;
+  },
+
+  async start(id) {
+    return this.update(id, { status: 'live' });
+  },
+
+  async end(id) {
+    return this.update(id, { status: 'ended', attended: CONFERENCES.find(c => c.id === id)?.registered || 0 });
+  },
+
+  async register(id, handle) {
+    const cls = CONFERENCES.find(c => c.id === id);
+    if (!cls) return null;
+    if (!cls.registrants) cls.registrants = [];
+    if (!cls.registrants.includes(handle)) {
+      cls.registrants.push(handle);
+      cls.registered = (cls.registered || 0) + 1;
+    }
+    this._persist();
+    return cls;
+  },
+
+  async unregister(id, handle) {
+    const cls = CONFERENCES.find(c => c.id === id);
+    if (!cls) return null;
+    if (cls.registrants) cls.registrants = cls.registrants.filter(h => h !== handle);
+    cls.registered = Math.max(0, (cls.registered || 0) - 1);
+    this._persist();
+    return cls;
+  },
+
+  async addToStage(id, handle) {
+    const cls = CONFERENCES.find(c => c.id === id);
+    if (!cls) return null;
+    if (!cls.stage) cls.stage = [];
+    if (!cls.stage.includes(handle)) cls.stage.push(handle);
+    this._persist();
+    return cls;
+  },
+
+  async removeFromStage(id, handle) {
+    const cls = CONFERENCES.find(c => c.id === id);
+    if (!cls) return null;
+    if (cls.stage) cls.stage = cls.stage.filter(h => h !== handle);
+    this._persist();
+    return cls;
+  },
+
+  async addChat(id, msg) {
+    const cls = CONFERENCES.find(c => c.id === id);
+    if (!cls) return null;
+    if (!cls.chat) cls.chat = [];
+    cls.chat.push(msg);
+    this._persist();
+    return cls;
+  },
+
+  async saveBoard(id, strokes) {
+    return this.update(id, { boardStrokes: strokes });
+  },
+};
+
+conferenceService.init();
+
+// ===== Attendance & KP rewards =====
+const ATTENDANCE_KEY = 'compass_attendance_v1';
+const KP_LOG_KEY = 'compass_kp_v1';
+const KP_PER_CLASS = 50;
+
+const readAttendance = () => {
+  try { return JSON.parse(localStorage.getItem(ATTENDANCE_KEY)) || {}; } catch { return {}; }
+};
+
+const hasAttended = (handle, classId) => {
+  const att = readAttendance();
+  return att[handle] && att[handle].includes(classId);
+};
+
+const readKpLog = () => {
+  try { return JSON.parse(localStorage.getItem(KP_LOG_KEY)) || {}; } catch { return {}; }
+};
+
+const awardAttendance = (handle, classId, className) => {
+  const att = readAttendance();
+  if (!att[handle]) att[handle] = [];
+  if (att[handle].includes(classId)) return 0;
+  att[handle].push(classId);
+  localStorage.setItem(ATTENDANCE_KEY, JSON.stringify(att));
+
+  const kpStore = readKpLog();
+  if (!kpStore[handle]) kpStore[handle] = { total: 0, log: [] };
+  kpStore[handle].total += KP_PER_CLASS;
+  kpStore[handle].log.push({ classId, className, kp: KP_PER_CLASS, when: new Date().toISOString().slice(0, 10) });
+  localStorage.setItem(KP_LOG_KEY, JSON.stringify(kpStore));
+
+  const user = USERS.find(u => u.handle === handle);
+  if (user) user.kp = (user.kp || 0) + KP_PER_CLASS;
+
+  return KP_PER_CLASS;
+};
+
+const getKpSummary = (handle) => {
+  const kpStore = readKpLog();
+  return kpStore[handle] || { total: 0, log: [] };
+};
+
+const getAttendedClasses = (handle) => {
+  const att = readAttendance();
+  return att[handle] || [];
+};
 
 // ===== Quests / streak =====
-const QUESTS = [
-  { id: 'q1', label: 'GM check-in', desc: 'Post in the daily check-in thread', kp: 10, done: true, icon: 'compass' },
-  { id: 'q2', label: 'Engage with alpha', desc: 'Comment on a post in Alpha Corner', kp: 15, done: true, icon: 'spark' },
-  { id: 'q3', label: 'Help a builder', desc: 'Reply to a question in any category', kp: 20, done: false, icon: 'chat' },
-  { id: 'q4', label: 'Attend a class', desc: 'Join any live class in Events', kp: 40, done: false, icon: 'cap' },
-  { id: 'q5', label: 'Share a signal', desc: 'Post original content to the feed', kp: 25, done: false, icon: 'sparkles' },
+const QUESTS_TEMPLATE = [
+  { id: 'q_read',   icon: 'news',    label: 'Read 3 posts',        desc: 'Read three topics in any category',        kp: 10 },
+  { id: 'q_reply',  icon: 'chat',    label: 'Reply to a topic',    desc: 'Contribute to a discussion thread',        kp: 5 },
+  { id: 'q_profile',icon: 'users',   label: 'Visit your profile',  desc: 'Check your dashboard and KP summary',      kp: 3 },
+  { id: 'q_space',  icon: 'mic',     label: 'React in a Space',    desc: 'Drop an emoji reaction in a live room',    kp: 5 },
+  { id: 'q_quest',  icon: 'spark',   label: 'Complete all quests', desc: 'Finish every quest on this list',          kp: 15 },
 ];
 
-// ===== Bounties board =====
-const BOUNTIES = [
-  { id: 'b1', title: 'Write a 1,500-word breakdown of Hyperliquid mechanics', org: 'Compass Editorial', orgHue: 65, reward: 300, token: 'USDC', tags: ['writing','defi'], deadline: '5 days left', applicants: 9, difficulty: 'Intermediate', status: 'open' },
-  { id: 'b2', title: 'Audit a 400-line staking contract before mainnet', org: 'Mesh Labs', orgHue: 165, reward: 2500, token: 'USDC', tags: ['audit','solidity'], deadline: '8 days left', applicants: 4, difficulty: 'Expert', status: 'open', featured: true },
-  { id: 'b3', title: 'Design a 6-screen mobile onboarding flow', org: 'Trove', orgHue: 5, reward: 1200, token: 'USDC', tags: ['design','figma'], deadline: '12 days left', applicants: 14, difficulty: 'Intermediate', status: 'open' },
-  { id: 'b4', title: 'Build a Farcaster frame for our quest system', org: 'Quipu', orgHue: 215, reward: 800, token: 'USDC', tags: ['frontend','farcaster'], deadline: '3 days left', applicants: 7, difficulty: 'Intermediate', status: 'open' },
-  { id: 'b5', title: 'Translate docs to French + Swahili', org: 'Africa Web3 Council', orgHue: 145, reward: 450, token: 'USDC', tags: ['translation'], deadline: '6 days left', applicants: 11, difficulty: 'Beginner', status: 'open' },
-  { id: 'b6', title: 'Record a 10-min explainer on account abstraction', org: 'Compass Academy', orgHue: 195, reward: 600, token: 'USDC', tags: ['video','education'], deadline: 'Closed', applicants: 22, difficulty: 'Intermediate', status: 'awarded', winner: 'kweku.sol' },
-];
+const QUESTS_KEY = 'compass_quests_v1';
+const QUESTS = [];
+
+const questService = {
+  _key: QUESTS_KEY,
+
+  async today() {
+    const today = new Date().toDateString();
+    try {
+      const raw = localStorage.getItem(this._key);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved.date === today) {
+          QUESTS.length = 0;
+          QUESTS.push(...saved.list);
+          return saved.list;
+        }
+      }
+    } catch {}
+    return this.reset();
+  },
+
+  async reset() {
+    const list = QUESTS_TEMPLATE.map(q => ({ ...q, done: false }));
+    QUESTS.length = 0;
+    QUESTS.push(...list);
+    try {
+      localStorage.setItem(this._key, JSON.stringify({ date: new Date().toDateString(), list }));
+    } catch {}
+    return list;
+  },
+
+  async complete(id) {
+    const q = QUESTS.find(x => x.id === id);
+    if (!q || q.done) return false;
+    q.done = true;
+
+    if (id === 'q_quest') {
+      const allDone = QUESTS.filter(x => x.id !== 'q_quest').every(x => x.done);
+      if (!allDone) {
+        q.done = false;
+        return false;
+      }
+    }
+
+    const user = USERS.find(u => u.handle === 'testuser');
+    if (user) user.kp = (user.kp || 0) + q.kp;
+
+    try {
+      localStorage.setItem(this._key, JSON.stringify({ date: new Date().toDateString(), list: QUESTS }));
+    } catch {}
+    return true;
+  },
+};
+
+questService.today();
+
+// ===== Spaces — in-memory cache backed by async service =====
+const SPACES = [];
+
+const spaceService = {
+  _key: 'compass_spaces_v1',
+
+  async init() {
+    try {
+      const raw = localStorage.getItem(this._key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        SPACES.length = 0;
+        SPACES.push(...parsed);
+      }
+    } catch {}
+    return SPACES;
+  },
+
+  _persist() {
+    try { localStorage.setItem(this._key, JSON.stringify(SPACES)); } catch {}
+  },
+
+  async list() { return [...SPACES]; },
+
+  async get(id) { return SPACES.find(s => s.id === id) || null; },
+
+  async create(space) {
+    SPACES.push(space);
+    this._persist();
+    return space;
+  },
+
+  async update(id, changes) {
+    const idx = SPACES.findIndex(s => s.id === id);
+    if (idx === -1) return null;
+    Object.assign(SPACES[idx], changes);
+    this._persist();
+    return SPACES[idx];
+  },
+
+  async delete(id) {
+    const idx = SPACES.findIndex(s => s.id === id);
+    if (idx === -1) return false;
+    SPACES.splice(idx, 1);
+    this._persist();
+    return true;
+  },
+
+  async addCohost(id, handle) {
+    const space = SPACES.find(s => s.id === id);
+    if (!space) return null;
+    if (!space.cohosts) space.cohosts = [];
+    if (!space.cohosts.includes(handle)) space.cohosts.push(handle);
+    this._persist();
+    return space;
+  },
+
+  async removeCohost(id, handle) {
+    const space = SPACES.find(s => s.id === id);
+    if (!space) return null;
+    if (space.cohosts) space.cohosts = space.cohosts.filter(h => h !== handle);
+    this._persist();
+    return space;
+  },
+
+  async bumpListeners(id, by = 1) {
+    const space = SPACES.find(s => s.id === id);
+    if (!space) return null;
+    space.listeners = (space.listeners || 0) + by;
+    this._persist();
+    return space;
+  },
+
+  async toggleReminder(id, on) {
+    const space = SPACES.find(s => s.id === id);
+    if (!space) return null;
+    space.reminders = Math.max(0, (space.reminders || 0) + (on ? 1 : -1));
+    this._persist();
+    return space;
+  },
+};
+
+spaceService.init();
+
+const BOUNTIES = [];
 
 // ===== Wallet / earnings =====
 const WALLET = {
-  balanceUSDC: 4280.50,
-  kp: 12480,
-  pendingEscrow: 1800,
-  thisMonth: 1420,
+  balanceUSDC: 0,
+  kp: 0,
+  pendingEscrow: 0,
+  thisMonth: 0,
   txns: [
-    { id: 'w1', kind: 'in',  label: 'Bounty payout — Hyperliquid breakdown', sub: 'Compass Editorial', amount: 300, token: 'USDC', when: 'May 26', icon: 'wallet' },
-    { id: 'w2', kind: 'in',  label: 'Gig delivery accepted — audit', sub: 'Mesh Labs', amount: 1800, token: 'USDC', when: 'May 24', icon: 'briefcase' },
-    { id: 'w3', kind: 'kp',  label: 'KP reward — moderator activity', sub: '+120 KP', amount: 120, token: 'KP', when: 'May 24', icon: 'medal' },
-    { id: 'w4', kind: 'out', label: 'Tipped @degenscout for Monad alpha', sub: 'Tip', amount: -25, token: 'USDC', when: 'May 23', icon: 'spark' },
-    { id: 'w5', kind: 'in',  label: 'Course sale — Solidity for production', sub: '3 enrollments', amount: 267, token: 'USDC', when: 'May 22', icon: 'cap' },
-    { id: 'w6', kind: 'kp',  label: 'KP reward — validated alpha', sub: '+80 KP', amount: 80, token: 'KP', when: 'May 21', icon: 'check' },
-    { id: 'w7', kind: 'out', label: 'Withdrawal to wallet 0x7a…3f2', sub: 'Yellow Card off-ramp', amount: -500, token: 'USDC', when: 'May 20', icon: 'arrow-up' },
   ],
 };
 
 // ===== Compass Pro =====
-const PRO_PLANS = [
-  { id: 'monthly', label: 'Monthly', price: 19, per: '/mo', note: 'Billed monthly' },
-  { id: 'yearly',  label: 'Yearly',  price: 14, per: '/mo', note: 'Billed $168/yr — save 26%', best: true },
-];
-const PRO_PERKS = [
-  { icon: 'spark',   title: 'Navigator-tier alpha', desc: 'Unlock tier-gated Alpha Corner posts and validated drops first.' },
-  { icon: 'wallet',  title: 'Reduced platform fees', desc: '3% talent + bounty fees instead of 7%. Pays for itself fast.' },
-  { icon: 'cap',     title: 'All premium classes', desc: 'Every paid class and recorded cohort, included.' },
-  { icon: 'mic',     title: 'Pro-only Spaces', desc: 'Private rooms with partners, founders and the Compass team.' },
-  { icon: 'medal',   title: '2× KP multiplier', desc: 'Climb the leaderboard twice as fast on every action.' },
-  { icon: 'sparkles', title: 'Pro badge', desc: 'A gold Pro mark on your profile and posts.' },
-];
+const PRO_PLANS = [];
+
+const PRO_PERKS = [];
 
 Object.assign(window, {
   CATEGORIES, USERS, userByHandle, TAGS, TOPICS, TRENDING_TAGS, EVENTS_UPCOMING,
   ONLINE_MEMBERS, CONTENT_ITEMS, NOTIFICATIONS, CONVERSATIONS, TALENT, TALENT_SKILLS,
-  REGIONS, SECTORS, MEMBERS, CONFERENCES, CAN_HOST_TIERS,
+  REGIONS, SECTORS, MEMBERS, CONFERENCES, CAN_HOST_TIERS, canCreateEvent, genConfId,
   QUESTS, BOUNTIES, WALLET, PRO_PLANS, PRO_PERKS,
+  SPACES, spaceService, conferenceService, questService, talentService,
+  hasAttended, awardAttendance, getKpSummary, getAttendedClasses, KP_PER_CLASS,
+  LEVEL_NAMES, LEVEL_THRESHOLDS, getLevelFromKp, getLevelName, getUserLevel,
+  parseLockLevel, CATEGORY_ACCESS, getCategoryAccess, canViewCategory, canPostCategory, canReplyCategory,
+  canViewTopic, canReplyTopic, requiredLevelLabel,
 });

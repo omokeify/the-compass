@@ -1,14 +1,15 @@
 // Conferences / Classes — admin Studio, schedule modal, class cards
 
-const canHost = (user) => CAN_HOST_TIERS.includes(user.tier);
+const canHost = (user) => canCreateEvent(user);
 
 // ---------- Class Card (shared: studio, events, dashboard) ----------
-const ClassCard = ({ cls, registered, onRegister, onJoin, onManage, admin }) => {
+const ClassCard = ({ cls, registered, onRegister, onJoin, onManage, admin, currentUser }) => {
   const host = userByHandle(cls.host);
   const cat = CATEGORIES.find(c => c.id === cls.cat);
   const seatsLeft = cls.capacity - cls.registered;
   const pct = Math.min(100, Math.round((cls.registered / cls.capacity) * 100));
   const isReg = registered && registered.has(cls.id);
+  const attended = currentUser && hasAttended(currentUser.handle, cls.id);
 
   return (
     <article className={`class-card status-${cls.status}`}>
@@ -65,7 +66,11 @@ const ClassCard = ({ cls, registered, onRegister, onJoin, onManage, admin }) => 
                   ? <button className="btn ghost sm registered" onClick={() => onRegister(cls)}><Icon name="check" size={11} /> Registered</button>
                   : <button className="btn primary sm" onClick={() => onRegister(cls)}>Register {seatsLeft <= 0 && '(waitlist)'}</button>
               )}
-              {cls.status === 'ended' && <button className="btn ghost sm" onClick={() => onJoin(cls)}><Icon name="play" size={11} /> Watch replay</button>}
+              {cls.status === 'ended' && (
+                attended
+                  ? <button className="btn primary sm" onClick={() => onJoin(cls)}><Icon name="play" size={11} /> Watch replay</button>
+                  : <button className="btn ghost sm" disabled><Icon name="lock" size={11} /> Purchase replay</button>
+              )}
             </>
           )}
         </div>
@@ -77,6 +82,15 @@ const ClassCard = ({ cls, registered, onRegister, onJoin, onManage, admin }) => 
 // ---------- Studio (admin/moderator only) ----------
 const StudioPage = ({ navigate, currentUser, registered, onRegister, onJoin, onSchedule }) => {
   const [tab, setTab] = React.useState('all');
+  const [list, setList] = React.useState(() => [...CONFERENCES]);
+
+  React.useEffect(() => { conferenceService.list().then(setList); }, []);
+
+  const refresh = () => { conferenceService.list().then(setList); };
+
+  // Expose refresh so ScheduleClassModal can trigger it
+  React.useEffect(() => { window.__studioRefresh = refresh; return () => { delete window.__studioRefresh; }; }, []);
+
   const tabs = [
     { id: 'all', label: 'All classes' },
     { id: 'live', label: 'Live', filter: c => c.status === 'live' },
@@ -84,7 +98,7 @@ const StudioPage = ({ navigate, currentUser, registered, onRegister, onJoin, onS
     { id: 'ended', label: 'Past', filter: c => c.status === 'ended' },
   ];
   const active = tabs.find(t => t.id === tab);
-  const list = active.filter ? CONFERENCES.filter(active.filter) : CONFERENCES;
+  const filtered = active.filter ? list.filter(active.filter) : list;
 
   if (!canHost(currentUser)) {
     return (
@@ -99,8 +113,8 @@ const StudioPage = ({ navigate, currentUser, registered, onRegister, onJoin, onS
     );
   }
 
-  const liveCount = CONFERENCES.filter(c => c.status === 'live').length;
-  const totalReg = CONFERENCES.reduce((s, c) => s + c.registered, 0);
+  const liveCount = list.filter(c => c.status === 'live').length;
+  const totalReg = list.reduce((s, c) => s + c.registered, 0);
 
   return (
     <div className="view studio-view">
@@ -122,7 +136,7 @@ const StudioPage = ({ navigate, currentUser, registered, onRegister, onJoin, onS
 
       <div className="studio-stats">
         <div className="ss-cell"><div className="ss-n">{liveCount}</div><div className="ss-l">live now</div></div>
-        <div className="ss-cell"><div className="ss-n">{CONFERENCES.filter(c=>c.status==='scheduled').length}</div><div className="ss-l">upcoming</div></div>
+        <div className="ss-cell"><div className="ss-n">{list.filter(c=>c.status==='scheduled').length}</div><div className="ss-l">upcoming</div></div>
         <div className="ss-cell"><div className="ss-n">{totalReg.toLocaleString()}</div><div className="ss-l">total registered</div></div>
         <div className="ss-cell"><div className="ss-n">96%</div><div className="ss-l">avg attendance</div></div>
       </div>
@@ -137,7 +151,7 @@ const StudioPage = ({ navigate, currentUser, registered, onRegister, onJoin, onS
       </div>
 
       <div className="class-grid">
-        {list.map(c => (
+        {filtered.map(c => (
           <ClassCard key={c.id} cls={c} admin registered={registered} onRegister={onRegister} onJoin={onJoin} onManage={() => onJoin(c)} />
         ))}
       </div>

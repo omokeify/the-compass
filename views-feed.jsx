@@ -2,142 +2,9 @@
 
 // Synthetic feed entries that go beyond plain TOPIC rows — they include
 // snippets, optional media blocks, reactions, etc.
-const FEED_ITEMS = [
-  {
-    id: 'f1',
-    cat: 'alpha',
-    author: 'degenscout',
-    when: '12m',
-    title: 'Monad mainnet airdrop checker is live — eligibility window closes Friday',
-    body: 'Cut-off is 23:59 UTC Friday. Three signal patterns I have validated against 40+ wallets: bridge volume ≥ $250 across 2+ epochs, min 12 unique contracts interacted, and you hold a Monad testnet OAT (the gold one). If you missed testnet there is still a path via ecosystem partners — do not sleep.',
-    validated: true,
-    reactions: { up: 312, comments: 84, shares: 22 },
-    pinned: true,
-  },
-  {
-    id: 'f2',
-    cat: 'news',
-    author: 'signal_op',
-    when: '38m',
-    title: 'Base announces $50M ecosystem fund — accepting builders from Africa & SEA',
-    body: 'Geographic mandate: Africa, SEA, LATAM. Applications open June 1. Compass will host an AMA with the Base BD team next Tuesday on the Discord stage. Slots are first-come — the BD team is moving fast on the early cohort.',
-    media: { kind: 'link', host: 'base.org', title: 'Base · $50M ecosystem fund', subtitle: 'Applications open June 1 → June 28', accent: '#0052ff' },
-    reactions: { up: 201, comments: 56, shares: 38 },
-    hot: true,
-  },
-  {
-    id: 'fp1',
-    cat: 'news',
-    author: 'compass.eth',
-    when: '45m',
-    title: 'Quick poll: where are you deploying next quarter?',
-    body: 'Curious where the community is heading. One vote each — results steer our next round of partner AMAs.',
-    media: { kind: 'poll', question: 'Which chain are you building on next?', closes: 'Closes in 2 days', options: [
-      { label: 'Base', votes: 412 },
-      { label: 'Solana', votes: 388 },
-      { label: 'Monad', votes: 521 },
-      { label: 'Still deciding', votes: 96 },
-    ] },
-    reactions: { up: 88, comments: 31, shares: 6 },
-  },
-  {
-    id: 'f3',
-    cat: 'activities',
-    author: 'fatima.lens',
-    when: '1h',
-    title: 'Voice of Impact — May winners + how to nominate for June',
-    body: 'Three contributors this month for going absurdly above and beyond. They each get a Voice of Impact slot, a 1k Compass grant, and first dibs on the June livestream. Nominations for June open today — names below.',
-    media: { kind: 'cards', items: [
-      { name: 'Tinuke A.',  role: 'Frontend dev · helped 18 builders ship',  hue: 290 },
-      { name: 'Mosi',       role: 'DAO governance · ran 4 retroPGF rounds',  hue: 215 },
-      { name: 'Ayodele',    role: 'First-time hunter, mentored 12 newcomers', hue: 340 },
-    ]},
-    reactions: { up: 96, comments: 27, shares: 14 },
-  },
-  {
-    id: 'f4',
-    cat: 'alpha',
-    author: '0xforesight',
-    when: '4h',
-    title: '[Locked alpha] Undisclosed L2 testnet — quest set drops Tuesday',
-    body: 'Validated by 2 Navigators. Full breakdown, contracts, and tier thresholds inside. Navigator tier or above to view — KP gated.',
-    locked: 'Navigator',
-    reactions: { up: 224, comments: 67, shares: 4 },
-  },
-  {
-    id: 'f5',
-    cat: 'news',
-    author: 'compass.eth',
-    when: '6h',
-    title: 'GM 🧭 — Sunday daily check-in',
-    body: 'What are you watching today? Drop one chart, one read, one ship — the daily check-in keeps the dial calibrated. 142 replies and counting.',
-    reactions: { up: 49, comments: 142, shares: 3 },
-  },
-  {
-    id: 'f6',
-    cat: 'activities',
-    author: 'iyabo_nft',
-    when: '7h',
-    title: 'New on-chain print series — Compass community drop',
-    body: 'I have been working on a six-piece print series inspired by the eight cardinal directions of the Compass community. Mint goes live to Navigators first on June 4. Proceeds split: 70% creators, 30% community treasury.',
-    media: { kind: 'gallery', items: [
-      { hue: 340 }, { hue: 18 }, { hue: 50 }, { hue: 195 },
-    ]},
-    reactions: { up: 88, comments: 21, shares: 11 },
-  },
-  {
-    id: 'f7',
-    cat: 'news',
-    author: 'kelechi.eth',
-    when: '8h',
-    title: 'Lagos Web3 Week — side event submission window closes Wednesday',
-    body: 'Hosts get three featured slots plus cross-promo across all Compass channels. Submit your event by 23:59 WAT on Wednesday — review turnaround is 48 hours.',
-    reactions: { up: 142, comments: 38, shares: 19 },
-    hot: true,
-  },
-  {
-    id: 'f8',
-    cat: 'alpha',
-    author: 'degenscout',
-    when: '11h',
-    title: 'Three Solana memecoins on the watchlist — entry criteria + risk notes',
-    body: 'Not financial advice. Pattern is the same on each: paired LP locked, dev wallet ≤ 5%, telegram growing organically. I am sizing 0.5% per name max. Charts and contracts inside.',
-    validated: true,
-    reactions: { up: 142, comments: 41, shares: 28 },
-  },
-  {
-    id: 'f9',
-    cat: 'activities',
-    author: 'mosi_dao',
-    when: '1d',
-    title: 'On-chain rep panel — speakers locked, agenda inside',
-    body: 'June 18 panel on on-chain rep systems. Confirmed: a Gitcoin lead, the Karma GAP team, and two retroPGF veterans. We will record and publish a written recap — Compass members get the unedited version.',
-    reactions: { up: 68, comments: 18, shares: 7 },
-  },
-];
+const FEED_ITEMS = [];
 
-const SAMPLE_COMMENTS = {
-  f1: [
-    { author: '0xforesight', when: '2h', body: 'Cross-checked against my six wallets — the OAT signal is real. Wallets without it got tier 3 max. Adding to the alpha index.', likes: 48, validated: true },
-    { author: 'kelechi.eth', when: '1h', body: 'Pinning this. Do NOT trust checker links from anywhere except the URL above. Two phishing copies already.', likes: 122, mod: true },
-    { author: 'ayo.web3',    when: '38m', body: 'First time qualifying for anything 🧭 thank you for the breakdown.', likes: 14 },
-  ],
-  f2: [
-    { author: 'tinuke.builds', when: '20m', body: 'Just submitted via the Compass partner link. The form took six minutes — clean.', likes: 24 },
-    { author: 'mosi_dao', when: '15m', body: 'AMA on Tuesday? I will be there.', likes: 11 },
-  ],
-  f3: [
-    { author: 'iyabo_nft', when: '40m', body: 'Tinuke deserves this twice over. The amount of devs she has unblocked privately is wild.', likes: 36 },
-  ],
-  f4: [
-    { author: 'degenscout', when: '3h', body: 'I will validate before Tuesday and post the addendum here.', likes: 18 },
-  ],
-  f5: [],
-  f6: [],
-  f7: [],
-  f8: [],
-  f9: [],
-};
+const SAMPLE_COMMENTS = {};
 
 const FEED_DRAFT_KEY = 'compass_feed_draft_v1';
 const FEED_TYPE_META = {
@@ -272,7 +139,7 @@ const InlineFeedComposer = ({ onCompose }) => {
   return (
     <div className="feed-inline-composer">
       <div className="fic-top">
-        <Avatar user={userByHandle('kelechi.eth')} size={38} />
+        <Avatar user={userByHandle('testuser')} size={38} />
         <div className="fic-body">
           <div className="fic-types">
             {Object.entries(FEED_TYPE_META).map(([type, meta]) => (
@@ -310,8 +177,62 @@ const InlineFeedComposer = ({ onCompose }) => {
   );
 };
 
+const readFollowingList = () => {
+  try {
+    const list = localStorage.getItem('compass_following_v1');
+    return list ? JSON.parse(list) : ['testuser'];
+  } catch {
+    return ['testuser'];
+  }
+};
+
+const toggleFollow = (authorHandle) => {
+  try {
+    const current = readFollowingList();
+    let next;
+    if (current.includes(authorHandle)) {
+      next = current.filter(h => h !== authorHandle);
+    } else {
+      next = [...current, authorHandle];
+    }
+    localStorage.setItem('compass_following_v1', JSON.stringify(next));
+    window.dispatchEvent(new Event('compass_following_changed'));
+  } catch {}
+};
+
+const normalizeFeedItem = (item) => {
+  if (item.author_handle) {
+    // Supabase format → mock format
+    return {
+      ...item,
+      author: item.author_handle,
+      when: item.created_at ? timeAgo(new Date(item.created_at)) : 'recent',
+      reactions: {
+        up: item.like_count || 0,
+        comments: item.comment_count || 0,
+        shares: item.repost_count || 0,
+      },
+      _supabase: true,
+    };
+  }
+  return item;
+};
+
+const timeAgo = (date) => {
+  const sec = Math.floor((Date.now() - date) / 1000);
+  if (sec < 60) return 'just now';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h`;
+  const d = Math.floor(hr / 24);
+  return `${d}d`;
+};
+
 const FeedCard = ({ item, navigate }) => {
-  const author = userByHandle(item.author);
+  const author = item._supabase
+    ? { handle: item.author_handle, name: item.author_name, avatar: item.author_avatar, hue: item.author_hue, tier: item.author_tier }
+    : userByHandle(item.author);
   const cat = CATEGORIES.find(c => c.id === item.cat);
 
   const [liked, setLiked] = React.useState(false);
@@ -319,26 +240,56 @@ const FeedCard = ({ item, navigate }) => {
   const [bookmarked, setBookmarked] = React.useState(() => isSaved('post', item.id));
   const [commentOpen, setCommentOpen] = React.useState(false);
   const [draft, setDraft] = React.useState('');
-  const [comments, setComments] = React.useState(SAMPLE_COMMENTS[item.id] || []);
+  const [comments, setComments] = React.useState([]);
   const [reported, setReported] = React.useState(false);
   const [shared, setShared] = React.useState(false);
 
+  // Load comments from Supabase if available
+  React.useEffect(() => {
+    if (item._supabase && item.id) {
+      supabaseService.getComments(item.id).then(c => {
+        if (c?.length) setComments(c.map(cm => ({
+          author: cm.author_id?.handle || 'user',
+          when: timeAgo(new Date(cm.created_at)),
+          body: cm.body,
+          likes: 0,
+        })));
+      }).catch(() => {});
+    }
+  }, [item.id, item._supabase]);
+
+  const [isFollowing, setIsFollowing] = React.useState(() => {
+    return readFollowingList().includes(item.author);
+  });
+
+  React.useEffect(() => {
+    const sync = () => {
+      setIsFollowing(readFollowingList().includes(item.author));
+    };
+    window.addEventListener('compass_following_changed', sync);
+    return () => window.removeEventListener('compass_following_changed', sync);
+  }, [item.author]);
+
   const submitComment = () => {
     if (!draft.trim()) return;
-    setComments(c => [...c, { author: 'kelechi.eth', when: 'just now', body: draft.trim(), likes: 0 }]);
+    setComments(c => [...c, { author: 'testuser', when: 'just now', body: draft.trim(), likes: 0 }]);
     setDraft('');
   };
+
+  const topComment = comments.length > 0
+    ? [...comments].sort((a, b) => (b.likes || 0) - (a.likes || 0))[0]
+    : null;
 
   return (
     <article className="feed-card">
       <header className="feed-head">
         <Avatar user={author} size={40} />
-        <div className="feed-head-body">
+        <div className="feed-head-body" onClick={() => navigate({ view: 'profile', handle: author.handle })} style={{ cursor: 'pointer' }}>
           <div className="feed-head-line">
             <span className="feed-author">{author.name}</span>
             <TierBadge tier={author.tier} />
             <span className="feed-handle">@{author.handle}</span>
-            <span className="feed-type-pill">{item.type || (item.cat === 'alpha' ? 'Signal' : item.cat === 'activities' ? 'Resource' : 'Update')}</span>
+            <span className="feed-type-pill">{item.type || (item.cat === 'alpha' ? 'Signal' : item.cat === 'earn' ? 'Bounty' : item.cat === 'activities' ? 'Resource' : 'Update')}</span>
           </div>
           <div className="feed-head-meta">
             <CategoryPill cat={cat} />
@@ -350,6 +301,17 @@ const FeedCard = ({ item, navigate }) => {
           </div>
         </div>
         <div className="feed-more">
+          {author.handle !== 'testuser' && (
+            <button
+              className={`btn ${isFollowing ? 'ghost' : 'solid'} sm follow-btn`}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFollow(author.handle);
+              }}
+            >
+              {isFollowing ? 'Following' : 'Follow'}
+            </button>
+          )}
           <button className={`btn ghost icon-only ${shared ? 'active' : ''}`} title={shared ? 'Copied' : 'Share'} onClick={() => setShared(true)}>
             <Icon name="reply" size={14} />
           </button>
@@ -359,7 +321,7 @@ const FeedCard = ({ item, navigate }) => {
         </div>
       </header>
 
-      <h2 className="feed-title">{item.title}</h2>
+      <h2 className="feed-title" onClick={() => navigate({ view: 'topic', topic: item.id })} style={{ cursor: 'pointer' }}>{item.title}</h2>
       <p className="feed-body">{item.body}</p>
       {item.locked && (
         <div className="feed-locked">
@@ -388,8 +350,30 @@ const FeedCard = ({ item, navigate }) => {
         onBookmark={() => { const now = toggleSaved({ id: item.id, type: 'post', title: item.title, sub: cat ? cat.name : 'Post', hue: cat ? CAT_META[cat.id].bg : '#FFEA00' }); setBookmarked(now); }}
       />
 
+      {/* Inline Thread Previews when thread is closed */}
+      {!commentOpen && item.cat === 'alpha' && item.validated && (
+        <div className="feed-thread-preview validated-preview" onClick={() => setCommentOpen(true)}>
+          <span className="ftp-badge validated"><Icon name="check" size={10} /> Validated</span>
+          <span className="ftp-body">Monad mainnet alpha double-checked by 2 Navigators. Click to inspect signatures.</span>
+          <span className="ftp-more-indicator">· {comments.length} replies</span>
+        </div>
+      )}
+
+      {!commentOpen && topComment && !(item.cat === 'alpha' && item.validated) && (
+        <div className="feed-thread-preview" onClick={() => setCommentOpen(true)}>
+          <Avatar user={userByHandle(topComment.author)} size={20} />
+          <span className="ftp-author">{userByHandle(topComment.author).name}:</span>
+          <span className="ftp-body">"{topComment.body.length > 80 ? topComment.body.slice(0, 80) + '...' : topComment.body}"</span>
+          <span className="ftp-more-indicator">· {comments.length} replies</span>
+        </div>
+      )}
+
       {commentOpen && (
         <div className="feed-comments">
+          <div className="fc-head-row">
+            <span className="fc-head-count">{comments.length} comments</span>
+            <button className="btn ghost sm" onClick={() => setCommentOpen(false)}>Collapse thread</button>
+          </div>
           {comments.length > 0 && (
             <ul className="fc-list">
               {comments.map((c, i) => {
@@ -399,7 +383,7 @@ const FeedCard = ({ item, navigate }) => {
                     <Avatar user={u} size={28} />
                     <div className="fc-row-body">
                       <div className="fc-row-head">
-                        <span className="fc-row-author">{u.name}</span>
+                        <span className="fc-row-author" onClick={() => navigate({ view: 'profile', handle: u.handle })} style={{ cursor: 'pointer' }}>{u.name}</span>
                         <TierBadge tier={u.tier} />
                         <span className="fc-row-when">· {c.when}</span>
                         {c.mod && <span className="tr-flag pin"><Icon name="compass" size={9} /> mod</span>}
@@ -417,7 +401,7 @@ const FeedCard = ({ item, navigate }) => {
             </ul>
           )}
           <div className="fc-composer">
-            <Avatar user={userByHandle('kelechi.eth')} size={28} />
+            <Avatar user={userByHandle('testuser')} size={28} />
             <input
               className="fc-input"
               placeholder="Write a comment…"
@@ -435,25 +419,93 @@ const FeedCard = ({ item, navigate }) => {
   );
 };
 
-const FeedView = ({ navigate, onCompose }) => {
+const SkeletonCard = () => (
+  <div className="skeleton-card">
+    <div className="skeleton-header">
+      <div className="skeleton-avatar" />
+      <div className="skeleton-meta">
+        <div className="skeleton-line short" />
+        <div className="skeleton-line medium" />
+      </div>
+    </div>
+    <div className="skeleton-line long skeleton-title" />
+    <div className="skeleton-body">
+      <div className="skeleton-line long" />
+      <div className="skeleton-line medium" />
+    </div>
+  </div>
+);
+
+
+const FeedView = ({ navigate, onCompose, currentUser }) => {
   const [filter, setFilter] = React.useState('all');
+  const [sort, setSort] = React.useState('latest');
+  const [loading, setLoading] = React.useState(false);
+  const [feedItems, setFeedItems] = React.useState([]);
+  const [followingUsers, setFollowingUsers] = React.useState([]);
+  const [userReactions, setUserReactions] = React.useState([]);
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const posts = await supabaseService.getPosts({ sort });
+        setFeedItems(posts);
+      } catch {
+        setFeedItems(FEED_ITEMS);
+      }
+    })();
+  }, [sort]);
+
+  React.useEffect(() => {
+    if (!currentUser?.id) return;
+    supabaseService.getUserReactions(currentUser.id).then(reactions => {
+      setUserReactions(reactions || []);
+    }).catch(() => {});
+
+    supabaseService.getFollowing(currentUser.id).then(follows => {
+      setFollowingUsers(follows.map(f => f.following_id));
+    }).catch(() => {});
+  }, [currentUser?.id]);
+
+  const refreshFeed = async () => {
+    setLoading(true);
+    try {
+      const posts = await supabaseService.getPosts({ sort });
+      setFeedItems(posts);
+    } catch {}
+    setTimeout(() => setLoading(false), 300);
+  };
+
+  const handleFilterChange = (nextFilter) => {
+    setLoading(true);
+    setFilter(nextFilter);
+    setTimeout(() => setLoading(false), 300);
+  };
+
+  const handleSortChange = (nextSort) => {
+    setLoading(true);
+    setSort(nextSort);
+    setTimeout(() => setLoading(false), 300);
+  };
+
   const filters = [
-    { id: 'all',        label: 'All',             icon: 'sparkles' },
-    { id: 'news',       label: 'News Highlights', icon: 'globe' },
-    { id: 'alpha',      label: 'Alpha',           icon: 'spark' },
-    { id: 'activities', label: 'Activities',      icon: 'book' },
+    { id: 'all',        label: 'All Feed',        icon: 'sparkles' },
+    { id: 'following',  label: 'Following',       icon: 'users' },
+    { id: 'alpha',      label: 'Alpha Highlights', icon: 'flame' },
   ];
 
-  const list = filter === 'all'
-    ? FEED_ITEMS
-    : FEED_ITEMS.filter(it => it.cat === filter);
+  // Dynamic filter
+  let list = [...feedItems];
+  if (filter === 'alpha') {
+    list = feedItems.filter(it => it.cat === 'alpha');
+  } else if (filter === 'following') {
+    list = feedItems.filter(it => followingUsers.includes(it.author_id));
+  }
 
-  const counts = {
-    all: FEED_ITEMS.length,
-    news: FEED_ITEMS.filter(i => i.cat === 'news').length,
-    alpha: FEED_ITEMS.filter(i => i.cat === 'alpha').length,
-    activities: FEED_ITEMS.filter(i => i.cat === 'activities').length,
-  };
+  // Dynamic sort
+  if (sort === 'hot') {
+    list.sort((a, b) => (b.like_count - a.like_count) || (b.comment_count - a.comment_count));
+  }
 
   return (
     <div className="view feed-view">
@@ -462,7 +514,7 @@ const FeedView = ({ navigate, onCompose }) => {
           <header className="feed-page-head">
             <div>
               <div className="section-eyebrow"><span className="section-eyebrow-dot" /> Your feed</div>
-              <h1 className="dash-title">What's happening across the Compass.</h1>
+
             </div>
             <button className="btn primary" onClick={onCompose}>
               <Icon name="plus" size={13} /> Post
@@ -474,18 +526,20 @@ const FeedView = ({ navigate, onCompose }) => {
               <button
                 key={f.id}
                 className={`feed-filter ${filter === f.id ? 'active' : ''}`}
-                onClick={() => setFilter(f.id)}
+                onClick={() => handleFilterChange(f.id)}
               >
                 <Icon name={f.icon} size={13} />
                 <span>{f.label}</span>
-                <span className="ff-count">{counts[f.id] || 0}</span>
+                <span className="ff-count">{feedItems.length}</span>
               </button>
             ))}
           </div>
 
+          <InlineFeedComposer onCompose={onCompose} />
+
           {/* Quick composer */}
-          <div className="feed-composer" onClick={onCompose}>
-            <Avatar user={userByHandle('kelechi.eth')} size={36} />
+          <div className="feed-composer feed-composer-legacy" onClick={onCompose}>
+            <Avatar user={userByHandle('testuser')} size={36} />
             <span className="fc-prompt">Share a signal, an alpha, or a question…</span>
             <span className="fc-tools">
               <Icon name="image" size={14} />
@@ -494,14 +548,62 @@ const FeedView = ({ navigate, onCompose }) => {
             </span>
           </div>
 
+          {/* Sorting Toolbar */}
+          <div className="feed-sorting-bar">
+            <span className="fsb-label">Sort by:</span>
+            <div className="fsb-options">
+              {[
+                { id: 'latest', label: 'Latest' },
+                { id: 'hot', label: 'Trending Hot' },
+                { id: 'unanswered', label: 'Unanswered' },
+                { id: 'validated', label: 'Validated Alpha' }
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  className={`fsb-opt ${sort === opt.id ? 'active' : ''}`}
+                  onClick={() => handleSortChange(opt.id)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="feed-stream">
-            {list.length === 0
-              ? <div className="empty">Nothing here yet — change the filter or start the conversation.</div>
-              : list.map(item => <FeedCard key={item.id} item={item} navigate={navigate} />)}
+            {loading ? (
+              <div className="skeleton-stream">
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+              </div>
+            ) : list.length === 0 ? (
+              <div className="empty">Nothing here yet — change the filter or start the conversation.</div>
+            ) : (
+              list.map(item => <FeedCard key={item.id} item={item} navigate={navigate} />)
+            )}
           </div>
         </div>
 
         <aside className="feed-rail">
+          <div className="rail-card today-card">
+            <div className="rail-card-head">
+              <span className="rail-card-title">Today</span>
+            </div>
+            <div className="today-grid">
+              {[
+                { label: 'Validated alpha', value: FEED_ITEMS.filter(i => i.validated).length, icon: 'check' },
+                { label: 'Open replies', value: FEED_ITEMS.reduce((n, i) => n + i.reactions.comments, 0), icon: 'chat' },
+                { label: 'Saved items', value: readSaved().length, icon: 'wallet' },
+              ].map(card => (
+                <div key={card.label} className="today-metric">
+                  <Icon name={card.icon} size={13} />
+                  <strong>{card.value.toLocaleString()}</strong>
+                  <span>{card.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="rail-card">
             <div className="rail-card-head">
               <span className="rail-card-title">Trending tags</span>
@@ -521,16 +623,31 @@ const FeedView = ({ navigate, onCompose }) => {
               <span className="rail-card-title">Who to follow</span>
             </div>
             <ul className="rail-users">
-              {[...USERS].sort((a,b)=>b.kp-a.kp).slice(0,4).map(u => (
-                <li key={u.handle} className="rail-user" onClick={() => navigate({ view: 'profile', handle: u.handle })}>
-                  <Avatar user={u} size={32} />
-                  <div className="ru-body">
-                    <div className="ru-name">{u.name}</div>
-                    <div className="ru-handle">@{u.handle}</div>
-                  </div>
-                  <button className="btn solid sm">Follow</button>
-                </li>
-              ))}
+              {[...USERS].sort((a,b)=>b.kp-a.kp).slice(0,4).map(u => {
+                const isFollowingThisUser = followingUsers.includes(u.handle);
+                return (
+                  <li key={u.handle} className="rail-user">
+                    <div onClick={() => navigate({ view: 'profile', handle: u.handle })} style={{ display: 'flex', gap: 10, flex: 1, cursor: 'pointer', alignItems: 'center' }}>
+                      <Avatar user={u} size={32} />
+                      <div className="ru-body">
+                        <div className="ru-name">{u.name}</div>
+                        <div className="ru-handle">@{u.handle}</div>
+                      </div>
+                    </div>
+                    {u.handle !== 'testuser' && (
+                      <button 
+                        className={`btn ${isFollowingThisUser ? 'ghost' : 'solid'} sm`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFollow(u.handle);
+                        }}
+                      >
+                        {isFollowingThisUser ? 'Following' : 'Follow'}
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </div>
 
@@ -543,6 +660,11 @@ const FeedView = ({ navigate, onCompose }) => {
           </div>
         </aside>
       </div>
+
+      {/* Floating Action Mobile Composer Button */}
+      <button className="mobile-fab-composer" onClick={onCompose} title="Create new post">
+        <Icon name="plus" size={24} />
+      </button>
     </div>
   );
 };

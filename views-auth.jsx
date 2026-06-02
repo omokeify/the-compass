@@ -17,10 +17,11 @@ const AuthPage = ({ initialMode = 'signin', onSignedIn, onSignedUp }) => {
   const submit = () => {
     if (!valid || busy) return;
     setBusy(true);
-    setTimeout(() => {
-      setBusy(false);
-      if (isSignup) onSignedUp(); else onSignedIn();
-    }, 850);
+    if (isSignup) {
+      onSignedUp({ email, password, name, handle });
+    } else {
+      onSignedIn({ email, password });
+    }
   };
 
   return (
@@ -39,24 +40,6 @@ const AuthPage = ({ initialMode = 'signin', onSignedIn, onSignedUp }) => {
           <div className="auth-pitch">
             <h1>Find your north in Web3.</h1>
             <p>Curated alpha, validated bounties, talent and live classes — the community where African builders trade signal.</p>
-          </div>
-
-          <div className="auth-quote">
-            <div className="aq-mark">“</div>
-            <p>Compass is the only feed I check before the charts. The alpha is real and the people are sharper than anywhere else.</p>
-            <div className="aq-by">
-              <Avatar user={userByHandle('degenscout')} size={36} />
-              <div>
-                <div className="aq-name">Amara · Navigator</div>
-                <div className="aq-role">Alpha hunter, Nairobi</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="auth-stats">
-            <div><strong>14,820</strong><span>builders</span></div>
-            <div><strong>$240k+</strong><span>bounties paid</span></div>
-            <div><strong>20+</strong><span>countries</span></div>
           </div>
         </div>
       </aside>

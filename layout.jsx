@@ -8,7 +8,8 @@ const ChevronRight = ({ size = 14 }) => (
 );
 
 const Sidebar = ({ route, navigate, currentUser }) => {
-  const isHost = currentUser && CAN_HOST_TIERS.includes(currentUser.tier);
+  const isHost = currentUser && canCreateEvent(currentUser);
+  const visibleCategories = currentUser ? CATEGORIES.filter(cat => canViewCategory(currentUser, cat.id)) : CATEGORIES;
   // Default the parent for the current view to be expanded
   const [expanded, setExpanded] = React.useState(() => ({
     discussions: route.view === 'category' || route.view === 'topic' || route.view === 'tag',
@@ -39,26 +40,18 @@ const Sidebar = ({ route, navigate, currentUser }) => {
         <button className={`nav-item ${isActive('spaces') ? 'active' : ''}`} onClick={() => navigate({ view: 'spaces' })}>
           <span className="ni-icon"><Icon name="mic" size={16} /></span>
           <span className="ni-label">Spaces</span>
-          <span className="ni-badge">3</span>
         </button>
         <button className={`nav-item ${isActive('talent') ? 'active' : ''}`} onClick={() => navigate({ view: 'talent' })}>
           <span className="ni-icon"><Icon name="briefcase" size={16} /></span>
           <span className="ni-label">Talent</span>
         </button>
-        <button className={`nav-item ${isActive('bounties') ? 'active' : ''}`} onClick={() => navigate({ view: 'bounties' })}>
-          <span className="ni-icon"><Icon name="wallet" size={16} /></span>
-          <span className="ni-label">Bounties</span>
-          <span className="ni-badge">28</span>
-        </button>
         <button className={`nav-item ${isActive('messages') ? 'active' : ''}`} onClick={() => navigate({ view: 'messages' })}>
           <span className="ni-icon"><Icon name="send" size={16} /></span>
           <span className="ni-label">Messages</span>
-          <span className="ni-badge">3</span>
         </button>
         <button className={`nav-item ${isActive('events') ? 'active' : ''}`} onClick={() => navigate({ view: 'events' })}>
           <span className="ni-icon"><Icon name="calendar" size={16} /></span>
           <span className="ni-label">Events</span>
-          <span className="ni-badge">6</span>
         </button>
         {isHost && (
           <button className={`nav-item ${isActive('studio') ? 'active' : ''}`} onClick={() => navigate({ view: 'studio' })}>
@@ -67,42 +60,48 @@ const Sidebar = ({ route, navigate, currentUser }) => {
             <span className="ni-badge admin">Mod</span>
           </button>
         )}
+        {isHost && (
+          <button className={`nav-item ${isActive('content') ? 'active' : ''}`} onClick={() => navigate({ view: 'content' })}>
+            <span className="ni-icon"><Icon name="book" size={16} /></span>
+            <span className="ni-label">Content</span>
+            <span className="ni-badge admin">Mod</span>
+          </button>
+        )}
 
         {/* Discussions (expandable parent) */}
-        <button
-          className={`nav-item ${expanded.discussions ? 'open' : ''} ${route.view === 'category' || route.view === 'topic' || route.view === 'tag' ? 'active' : ''}`}
-          onClick={() => toggle('discussions')}
-        >
-          <span className="ni-icon"><Icon name="chat" size={16} /></span>
-          <span className="ni-label">Discussions</span>
-          <span className="ni-chev"><ChevronRight size={12} /></span>
-        </button>
-        {expanded.discussions && (
-          <div className="nav-sub">
-            {CATEGORIES.map(cat => {
-              const meta = CAT_META[cat.id];
-              return (
-                <button
-                  key={cat.id}
-                  className={`nav-subitem ${route.view === 'category' && route.cat === cat.id ? 'active' : ''}`}
-                  onClick={() => navigate({ view: 'category', cat: cat.id })}
-                >
-                  <span className="sub-dot" style={{ background: meta.bg }} />
-                  <span>{cat.name}</span>
-                </button>
-              );
-            })}
-          </div>
+        {visibleCategories.length > 0 && (
+          <>
+            <button
+              className={`nav-item ${expanded.discussions ? 'open' : ''} ${route.view === 'category' || route.view === 'topic' || route.view === 'tag' ? 'active' : ''}`}
+              onClick={() => toggle('discussions')}
+            >
+              <span className="ni-icon"><Icon name="chat" size={16} /></span>
+              <span className="ni-label">Discussions</span>
+              <span className="ni-chev"><ChevronRight size={12} /></span>
+            </button>
+            {expanded.discussions && (
+              <div className="nav-sub">
+                {visibleCategories.map(cat => {
+                  const meta = CAT_META[cat.id];
+                  return (
+                    <button
+                      key={cat.id}
+                      className={`nav-subitem ${route.view === 'category' && route.cat === cat.id ? 'active' : ''}`}
+                      onClick={() => navigate({ view: 'category', cat: cat.id })}
+                    >
+                      <span className="sub-dot" style={{ background: meta.bg }} />
+                      <span>{cat.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
 
         <button className={`nav-item ${isActive('leaderboard') ? 'active' : ''}`} onClick={() => navigate({ view: 'leaderboard' })}>
           <span className="ni-icon"><Icon name="medal" size={16} /></span>
           <span className="ni-label">Leaderboard</span>
-        </button>
-        <button className={`nav-item pro-nav ${isActive('pro') ? 'active' : ''}`} onClick={() => navigate({ view: 'pro' })}>
-          <span className="ni-icon"><Icon name="spark" size={16} /></span>
-          <span className="ni-label">Compass Pro</span>
-          <span className="ni-badge pro">PRO</span>
         </button>
       </div>
 
@@ -223,9 +222,9 @@ const TopBar = ({ route, navigate, onCompose, currentUser, onOpenNotifs, onOpenS
   if (route.view === 'members')  crumbs.push({ label: 'Members' });
   if (route.view === 'spaces')   crumbs.push({ label: 'Spaces' });
   if (route.view === 'messages') crumbs.push({ label: 'Messages' });
+  if (route.view === 'content') crumbs.push({ label: 'Content' });
   if (route.view === 'leaderboard') crumbs.push({ label: 'Leaderboard' });
   if (route.view === 'pro') crumbs.push({ label: 'Compass Pro' });
-  if (route.view === 'bounties') crumbs.push({ label: 'Bounties' });
   if (route.view === 'article') {
     crumbs.push({ label: 'Home', go: () => navigate({ view: 'home' }) });
     const a = (window.CONTENT_ITEMS || []).find(c => c.id === route.id);

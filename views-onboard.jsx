@@ -98,14 +98,28 @@ const OnboardingWizard = ({ onClose, onComplete, currentUser }) => {
 
 // ---------- Daily quests widget (home) ----------
 const QuestsWidget = ({ navigate }) => {
-  const [quests, setQuests] = React.useState(QUESTS);
+  const [quests, setQuests] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    window.questService.today().then(list => { setQuests(list); setLoading(false); });
+  }, []);
+
   const doneCount = quests.filter(q => q.done).length;
   const total = quests.length;
   const earned = quests.filter(q => q.done).reduce((s, q) => s + q.kp, 0);
   const possible = quests.reduce((s, q) => s + q.kp, 0);
-  const pct = Math.round((doneCount / total) * 100);
+  const pct = total ? Math.round((doneCount / total) * 100) : 0;
 
-  const complete = (id) => setQuests(qs => qs.map(q => q.id === id ? { ...q, done: true } : q));
+  const complete = async (id) => {
+    const ok = await window.questService.complete(id);
+    if (ok) {
+      setQuests(qs => qs.map(q => q.id === id ? { ...q, done: true } : q));
+      if (typeof window.refreshUser === 'function') window.refreshUser();
+    }
+  };
+
+  if (loading) return null;
 
   return (
     <div className="quests-widget">

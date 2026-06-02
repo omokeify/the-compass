@@ -1,7 +1,7 @@
 // Topic, Profile, Leaderboard, Events, Tag, Composer — modern light edition
 
 // ---------- Topic Detail ----------
-const TopicPage = ({ topicId, navigate }) => {
+const TopicPage = ({ topicId, navigate, currentUser }) => {
   const topic = TOPICS.find(t => t.id === topicId);
   if (!topic) return <div className="view"><div className="empty">Topic not found.</div></div>;
   const cat = CATEGORIES.find(c => c.id === topic.cat);
@@ -11,11 +11,28 @@ const TopicPage = ({ topicId, navigate }) => {
   const [liked, setLiked] = React.useState(false);
   const [replies, setReplies] = React.useState(topic.replyThread || []);
 
+  const canView = canViewTopic(currentUser, topic);
+  const canReply = canReplyTopic(currentUser, topic);
+  const viewLevel = topic.locked ? parseLockLevel(topic.locked) : getCategoryAccess(topic.cat).view;
+  const replyLevel = topic.locked ? parseLockLevel(topic.locked) : getCategoryAccess(topic.cat).reply;
+
   const submitReply = () => {
-    if (!reply.trim()) return;
-    setReplies(r => [...r, { author: 'kelechi.eth', when: 'just now', body: reply.trim(), likes: 0 }]);
+    if (!reply.trim() || !canReply) return;
+    setReplies(r => [...r, { author: currentUser.handle, when: 'just now', body: reply.trim(), likes: 0 }]);
     setReply('');
   };
+
+  if (!canView) {
+    return (
+      <div className="view topic-locked">
+        <div className="locked-panel">
+          <h2>Topic gated</h2>
+          <p>This thread is locked behind a higher Compass level.</p>
+          <p className="locked-note">Reach {requiredLevelLabel(viewLevel)} to read and reply.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="view topic">
@@ -26,6 +43,7 @@ const TopicPage = ({ topicId, navigate }) => {
           {topic.hot && <span className="tr-flag hot"><Icon name="flame" size={10} /> hot</span>}
           {topic.validated && <span className="tr-flag validated"><Icon name="check" size={10} /> validated</span>}
           {topic.locked && <span className="tr-flag lock"><Icon name="lock" size={10} /> {topic.locked}+</span>}
+          {topic.type === 'blog' && <span className="tr-flag blog" style={{ background: 'var(--brand-yellow)', color: '#000' }}><Icon name="edit" size={10} /> blog</span>}
         </span>
         <h1 className="topic-title">{topic.title}</h1>
         <div className="topic-submeta">
@@ -118,13 +136,14 @@ const TopicPage = ({ topicId, navigate }) => {
       </div>
 
       <div className="reply-composer">
-        <Avatar user={userByHandle('kelechi.eth')} size={36} />
+        <Avatar user={currentUser} size={36} />
         <div className="rc-wrap">
           <textarea
-            placeholder="Add to the thread…"
+            placeholder={canReply ? 'Add to the thread…' : 'Reach a higher level to reply.'}
             value={reply}
             onChange={e => setReply(e.target.value)}
             rows={3}
+            disabled={!canReply}
           />
           <div className="rc-foot">
             <div className="rc-tips">
@@ -133,10 +152,13 @@ const TopicPage = ({ topicId, navigate }) => {
               <kbd className="kbd">@</kbd>
               <span className="rc-tip-text">Markdown supported · @ to mention</span>
             </div>
-            <button className="btn primary sm" disabled={!reply.trim()} onClick={submitReply}>
+            <button className="btn primary sm" disabled={!reply.trim() || !canReply} onClick={submitReply}>
               <Icon name="send" size={11} /> Reply
             </button>
           </div>
+          {!canReply && (
+            <div className="locked-note">Requires {requiredLevelLabel(replyLevel)} to reply in this thread.</div>
+          )}
         </div>
       </div>
     </div>
@@ -147,6 +169,7 @@ const TopicPage = ({ topicId, navigate }) => {
 const PROFILE_MENU = [
   { id: 'overview',      label: 'Overview',          icon: 'home' },
   { id: 'edit',          label: 'Edit Profile',      icon: 'gear' },
+  { id: 'portfolio',     label: 'My Gigs',           icon: 'briefcase' },
   { id: 'saved',         label: 'Saved',             icon: 'bookmark' },
   { id: 'wallet',        label: 'Wallet',            icon: 'wallet' },
   { id: 'groups',        label: 'My Groups',         icon: 'users' },
@@ -159,8 +182,33 @@ const PROFILE_MENU = [
   { id: 'logout',        label: 'Logout',            icon: 'arrow-right', danger: true },
 ];
 
-const ProfilePage = ({ handle, navigate, tab }) => {
-  const u = userByHandle(handle);
+const readFollowingList = () => {
+  try {
+    const list = localStorage.getItem('compass_following_v1');
+    return list ? JSON.parse(list) : ['testuser'];
+  } catch {
+    return ['testuser'];
+  }
+};
+
+const toggleFollow = (authorHandle) => {
+  try {
+    const current = readFollowingList();
+    let next;
+    if (current.includes(authorHandle)) {
+      next = current.filter(h => h !== authorHandle);
+    } else {
+      next = [...current, authorHandle];
+    }
+    localStorage.setItem('compass_following_v1', JSON.stringify(next));
+    window.dispatchEvent(new Event('compass_following_changed'));
+  } catch {}
+};
+
+const ProfilePage = ({ handle, navigate, tab, currentUser }) => {
+  const actualHandle = handle || currentUser?.handle;
+  const u = userByHandle(actualHandle);
+  const isMe = actualHandle === currentUser?.handle;
   const [active, setActive] = React.useState(tab || 'overview');
   React.useEffect(() => { if (tab) setActive(tab); }, [tab]);
 
@@ -170,6 +218,18 @@ const ProfilePage = ({ handle, navigate, tab }) => {
       navigate({ view: 'profile', handle, tab: nextTab === 'overview' ? undefined : nextTab });
     }
   };
+
+  if (!u) {
+    return (
+      <div className="view">
+        <div className="empty">Profile not found.</div>
+      </div>
+    );
+  }
+
+  if (!isMe) {
+    return <PublicProfilePage u={u} activeTab={active} selectTab={selectTab} navigate={navigate} />;
+  }
 
   return (
     <div className="view profile-dash">
@@ -209,6 +269,319 @@ const ProfilePage = ({ handle, navigate, tab }) => {
   );
 };
 
+const PublicProfilePage = ({ u, activeTab, selectTab, navigate }) => {
+  if (!u) {
+    return (
+      <div className="view">
+        <div className="empty">Profile not found.</div>
+      </div>
+    );
+  }
+
+  const [availability, setAvailability] = React.useState(() => {
+    try {
+      const saved = localStorage.getItem(`compass_availability_${u.handle}`);
+      return saved || (u.handle === 'testuser' ? 'Open to opportunities' : 'Hiring');
+    } catch {
+      return 'Open to gigs';
+    }
+  });
+
+  const [following, setFollowing] = React.useState(() => {
+    return readFollowingList().includes(u.handle);
+  });
+
+  React.useEffect(() => {
+    const sync = () => {
+      setFollowing(readFollowingList().includes(u.handle));
+      const saved = localStorage.getItem(`compass_availability_${u.handle}`);
+      if (saved) setAvailability(saved);
+    };
+    window.addEventListener('compass_following_changed', sync);
+    window.addEventListener('compass_availability_changed', sync);
+    return () => {
+      window.removeEventListener('compass_following_changed', sync);
+      window.removeEventListener('compass_availability_changed', sync);
+    };
+  }, [u.handle]);
+
+  const toggleFollowProfile = () => {
+    toggleFollow(u.handle);
+    setFollowing(!following);
+  };
+
+  const tabs = [
+    { id: 'overview',      label: 'Overview',      icon: 'home' },
+    { id: 'portfolio',     label: 'Portfolio (Gigs)', icon: 'briefcase' },
+    { id: 'courses',       label: 'Learning & Badges', icon: 'cap' },
+    { id: 'contributions', label: 'Contributions',  icon: 'chat' }
+  ];
+
+  return (
+    <div className="view public-profile">
+      <div className="prof-cover-sm" style={{ '--cover-bg': `linear-gradient(120deg, oklch(0.55 0.18 ${u.hue}), oklch(0.32 0.12 ${u.hue}))` }}>
+        <div className="prof-cover-grid" />
+        <div className="prof-cover-tag">
+          <TierBadge tier={u.tier} />
+          <span>· Bearing 038°</span>
+        </div>
+      </div>
+
+      <header className="public-profile-header">
+        <div className="pp-header-top">
+          <Avatar user={u} size={80} ring />
+          <div className="pp-header-actions">
+            <button className={following ? 'btn ghost' : 'btn primary'} onClick={toggleFollowProfile}>
+              {following ? <><Icon name="check" size={12} /> Following</> : <><Icon name="plus" size={12} /> Follow</>}
+            </button>
+            <button className="btn ghost" onClick={() => navigate({ view: 'messages' })}>
+              <Icon name="send" size={12} /> Message
+            </button>
+          </div>
+        </div>
+
+        <div className="pp-header-info">
+          <div className="pp-name-row">
+            <h1 className="pp-name">{u.name}</h1>
+            <span className={`availability-badge status-${availability.toLowerCase().replace(/\s+/g, '-')}`}>
+              <span className="pulse-dot" /> {availability}
+            </span>
+          </div>
+          <div className="pp-handle">@{u.handle} · {u.loc}</div>
+          <p className="pp-bio">{u.bio || 'Smart contract builder and Web3 developer contributing to the Compass community.'}</p>
+          
+          <div className="pp-meta-strip">
+            <div className="pp-meta-item">
+              <span className="pp-meta-val">{formatNum(u.kp)}</span>
+              <span className="pp-meta-lbl">KP score</span>
+            </div>
+          </div>
+        </div>
+
+        <nav className="pp-tabs">
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              className={`pp-tab ${activeTab === t.id ? 'active' : ''}`}
+              onClick={() => selectTab(t.id)}
+            >
+              <Icon name={t.icon} size={13} />
+              <span>{t.label}</span>
+            </button>
+          ))}
+        </nav>
+      </header>
+
+      <main className="pp-content">
+        <PublicPanel u={u} tab={activeTab} navigate={navigate} />
+      </main>
+    </div>
+  );
+};
+
+// New component to combine courses and certificates (badges)
+const PublicCoursesBadges = ({ u }) => (
+  <div className="public-courses-badges" style={{ display: 'grid', gap: '24px', gridTemplateColumns: '1fr 1fr' }}>
+    <div>
+      <h2 className="dash-section-title">My Courses</h2>
+      <DashCourses u={u} />
+    </div>
+    <div>
+      <h2 className="dash-section-title">My Badges & Certificates</h2>
+      <DashCertificates u={u} />
+    </div>
+  </div>
+);
+
+const PublicPanel = ({ u, tab, navigate }) => {
+  if (tab === 'overview') {
+    return (
+      <div className="pp-overview-grid">
+        <div className="pp-overview-main">
+          <h2 className="dash-section-title">Knowledge Points (KP) Log</h2>
+          <KPBreakdownPanel u={u} />
+          
+          <h2 className="dash-section-title" style={{ marginTop: 24 }}>Recent Activity</h2>
+          <DashContributions u={u} navigate={navigate} />
+        </div>
+        <aside className="pp-overview-side">
+          <div className="rail-card">
+            <div className="rail-card-head"><span className="rail-card-title">Skills & Specialties</span></div>
+            <div className="pp-specialties">
+              <span className="empty" style={{ padding: 12 }}>No skills listed yet.</span>
+            </div>
+          </div>
+          <div className="rail-card subtle">
+            <div className="rail-note-title">Trust & Reputation</div>
+            <div className="empty" style={{ padding: '12px 16px' }}>No reputation data yet.</div>
+          </div>
+        </aside>
+      </div>
+    );
+  }
+  if (tab === 'portfolio') {
+    return <DashPortfolio u={u} />;
+  }
+  if (tab === 'courses') {
+    // Combined courses and badges view
+    return <PublicCoursesBadges u={u} />;
+  }
+  if (tab === 'contributions') {
+    return <DashContributions u={u} navigate={navigate} />;
+  }
+  return null;
+};
+
+const KPBreakdownPanel = ({ u }) => {
+  const kpLog = getKpSummary(u.handle);
+  return (
+    <div className="kp-breakdown-card">
+      <div className="kp-breakdown-header">
+        <Icon name="medal" size={18} />
+        <span>Earned Reputation Summary ({formatNum(u.kp)} Total KP)</span>
+      </div>
+      {kpLog.log.length === 0 ? (
+        <div className="empty" style={{ padding: 24 }}>No KP earned yet — attend classes and complete quests to earn reputation.</div>
+      ) : (
+        <ul className="kp-breakdown-list">
+          {kpLog.log.map((log, i) => (
+            <li key={i} className="kp-breakdown-row">
+              <div className="kpb-info">
+                <span className="kpb-label">{log.className}</span>
+                <span className="kpb-when">{log.when}</span>
+              </div>
+              <span className="kpb-points">+{log.kp} KP</span>
+            </li>
+          ))}
+          <li className="kp-breakdown-row total">
+            <div className="kpb-info"><span className="kpb-label">Total earned from classes</span></div>
+            <span className="kpb-points">+{kpLog.total} KP</span>
+          </li>
+        </ul>
+      )}
+    </div>
+  );
+};
+
+const DashPortfolio = ({ u, editable }) => {
+  const [myGigs, setMyGigs] = React.useState([]);
+  const [editing, setEditing] = React.useState(null);
+
+  React.useEffect(() => {
+    // always use fresh data so edits reflect immediately
+    setMyGigs(TALENT.filter(g => g.author === u.handle));
+  }, [u.handle, editing]);
+
+  const handleSave = async (id, changes) => {
+    try {
+      await window.talentService.update(id, changes, u);
+      setEditing(null);
+      setMyGigs(TALENT.filter(g => g.author === u.handle));
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  return (
+    <div>
+      <div className="section-head" style={{ marginBottom: 16 }}>
+        <div>
+          <h2 className="dash-section-title">Active Builder Gigs</h2>
+          <p className="section-sub">Web3 services offered by @{u.handle} in Skill Marketplace.</p>
+        </div>
+      </div>
+      {myGigs.length === 0 ? (
+        <div className="empty">This builder hasn't listed any gigs in the marketplace yet.</div>
+      ) : (
+        <div className="talent-grid">
+          {myGigs.map(g => (
+            <article key={g.id} className="talent-card">
+              <div className="tc-cover" style={{ background: `linear-gradient(135deg, oklch(0.65 0.16 ${g.bgHue}), oklch(0.42 0.14 ${g.bgHue}))` }}>
+                <div className="tc-cover-grid" />
+                <div className="tc-skill">{g.skill}</div>
+                {editable && (
+                  <div className="tc-cover-actions">
+                    <button className="btn ghost xs" style={{ background: 'rgba(0,0,0,0.4)', color: '#fff', backdropFilter: 'blur(4px)' }} onClick={() => setEditing(g)}>
+                      <Icon name="gear" size={11} /> Edit
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="tc-body">
+                <h3 className="tc-title">{g.title}</h3>
+                <div className="tc-tags">
+                  {g.tags.map(t => <span key={t} className="tc-tag">#{t}</span>)}
+                </div>
+                <div className="tc-foot">
+                  <div className="tc-rating">
+                    <span className="tc-star">★</span>
+                    <span className="tc-rate">{g.rating.toFixed(1)}</span>
+                    <span className="tc-rev">({g.reviews})</span>
+                  </div>
+                  <div className="tc-price">
+                    <span className="tc-price-l">Starting from</span>
+                    <span className="tc-price-n">${g.price}</span>
+                  </div>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {editing && (
+        <GigEditorModal gig={editing} onSave={handleSave} onClose={() => setEditing(null)} />
+      )}
+    </div>
+  );
+};
+
+const GigEditorModal = ({ gig, onSave, onClose }) => {
+  const [title, setTitle] = React.useState(gig.title);
+  const [bio, setBio] = React.useState(gig.bio);
+  const [description, setDesc] = React.useState(gig.description);
+  const [price, setPrice] = React.useState(String(gig.price));
+  const [tagsStr, setTagsStr] = React.useState((gig.tags || []).join(', '));
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 600, width: '90%' }} onClick={e => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3 className="modal-title">Edit gig</h3>
+          <button className="btn ghost icon-only" onClick={onClose}><Icon name="x" size={14} /></button>
+        </div>
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <label style={{ fontWeight: 600, fontSize: 13 }}>Title</label>
+          <input className="field" value={title} onChange={e => setTitle(e.target.value)} />
+
+          <label style={{ fontWeight: 600, fontSize: 13 }}>Bio / tagline</label>
+          <input className="field" value={bio} onChange={e => setBio(e.target.value)} />
+
+          <label style={{ fontWeight: 600, fontSize: 13 }}>Description</label>
+          <textarea className="field" rows={5} value={description} onChange={e => setDesc(e.target.value)} />
+
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontWeight: 600, fontSize: 13 }}>Starting price ($)</label>
+              <input className="field" type="number" value={price} onChange={e => setPrice(e.target.value)} />
+            </div>
+            <div style={{ flex: 2 }}>
+              <label style={{ fontWeight: 600, fontSize: 13 }}>Tags (comma-separated)</label>
+              <input className="field" value={tagsStr} onChange={e => setTagsStr(e.target.value)} />
+            </div>
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="btn ghost" onClick={onClose}>Cancel</button>
+          <button className="btn primary" onClick={() => onSave(gig.id, { title, bio, description, price: Number(price), tags: tagsStr.split(',').map(t => t.trim()).filter(Boolean) })}>
+            <Icon name="check" size={12} /> Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DashboardPanel = ({ u, tab, navigate }) => {
   if (tab === 'overview')      return <DashOverview u={u} navigate={navigate} />;
   if (tab === 'edit')          return <DashEditProfile u={u} />;
@@ -219,6 +592,7 @@ const DashboardPanel = ({ u, tab, navigate }) => {
   if (tab === 'courses')       return <DashCourses u={u} />;
   if (tab === 'contributions') return <DashContributions u={u} navigate={navigate} />;
   if (tab === 'certificates')  return <DashCertificates u={u} />;
+  if (tab === 'portfolio')     return <DashPortfolio u={u} editable />;
   if (tab === 'rules')         return <DashRules />;
   if (tab === 'settings')      return <DashSettings />;
   if (tab === 'logout')        return <DashLogout />;
@@ -236,33 +610,13 @@ const PanelHeader = ({ kicker, title, sub, action }) => (
   </header>
 );
 
-// ---------- Sub-panels ----------
 const DashOverview = ({ u, navigate }) => {
-  const posts = TOPICS.filter(t => t.author === u.handle);
-  const [following, setFollowing] = React.useState(false);
-  const [followers, setFollowers] = React.useState(1248);
-  const toggleFollow = () => {
-    setFollowing(f => !f);
-    setFollowers(c => following ? c - 1 : c + 1);
-  };
   return (
     <>
       <PanelHeader
         kicker="Welcome back"
         title={`Hi, ${u.name.split(' ')[0]}.`}
         sub="Here's your bearing this month — KP, validations, and what's on the horizon."
-        action={
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className={following ? 'btn ghost' : 'btn primary'} onClick={toggleFollow}>
-              {following
-                ? <><Icon name="check" size={12} /> Following</>
-                : <><Icon name="plus" size={12} /> Follow</>}
-            </button>
-            <button className="btn ghost" onClick={() => navigate({ view: 'messages' })}>
-              <Icon name="send" size={12} /> Message
-            </button>
-          </div>
-        }
       />
       <div className="prof-cover-sm" style={{ '--cover-bg': `linear-gradient(120deg, oklch(0.55 0.18 ${u.hue}), oklch(0.32 0.12 ${u.hue}))` }}>
         <div className="prof-cover-grid" />
@@ -272,16 +626,10 @@ const DashOverview = ({ u, navigate }) => {
         </div>
       </div>
       <div className="dash-stats">
-        {[['1,420','KP this month'], ['12','Posts'], ['238','Replies'], [followers.toLocaleString(),'Followers']].map(([n,l]) => (
+        {[['0','KP this month'], ['0','Posts'], ['0','Replies'], ['0','Followers']].map(([n,l]) => (
           <div key={l} className="ds-cell"><div className="ds-n">{n}</div><div className="ds-l">{l}</div></div>
         ))}
       </div>
-      <h2 className="dash-section-title">Your recent posts</h2>
-      {posts.length === 0
-        ? <div className="empty">No posts yet — head to Discussions to start one.</div>
-        : <div className="discussion-card">
-            {posts.map(t => <TopicRow key={t.id} topic={t} navigate={navigate} />)}
-          </div>}
     </>
   );
 };
@@ -296,168 +644,318 @@ const Field = ({ label, value, type = 'text', textarea, hint }) => (
   </label>
 );
 
-const DashEditProfile = ({ u }) => (
-  <>
-    <PanelHeader
-      kicker="Account"
-      title="Edit your profile."
-      sub="What you change here is visible to everyone in the community."
-      action={<button className="btn primary">Save changes</button>}
-    />
-    <div className="dash-card">
-      <div className="edit-avatar-row">
-        <Avatar user={u} size={80} ring />
-        <div>
-          <button className="btn solid sm">Upload photo</button>
-          <button className="btn ghost sm" style={{ marginLeft: 8 }}>Remove</button>
-          <p className="field-hint" style={{ marginTop: 8 }}>PNG or JPG. Max 2MB.</p>
-        </div>
-      </div>
-      <div className="field-grid">
-        <Field label="Full name" value={u.name} />
-        <Field label="Handle" value={u.handle} hint="compass.community/@your-handle" />
-        <Field label="Email" value="kelechi@compass.community" type="email" />
-        <Field label="Location" value={u.loc} />
-        <div style={{ gridColumn: '1 / -1' }}>
-          <Field label="Bio" value={u.bio} textarea />
-        </div>
-        <Field label="X / Twitter" value="@kelechi_eth" />
-        <Field label="Farcaster" value="kelechi.eth" />
-      </div>
-    </div>
-  </>
-);
+const DashEditProfile = ({ u }) => {
+  const [availability, setAvailability] = React.useState(() => {
+    return localStorage.getItem(`compass_availability_${u.handle}`) || 'Mentoring';
+  });
 
-const DashGroups = ({ u }) => {
-  const groups = [
-    { id: 1, name: 'Lagos Builders', members: 248, hue: 25 },
-    { id: 2, name: 'Solidity Auditors', members: 86, hue: 145 },
-    { id: 3, name: 'ZK Cohort · 03', members: 42, hue: 195 },
-    { id: 4, name: 'Voice of Impact Jury', members: 11, hue: 340 },
-  ];
+  const changeAvailability = (val) => {
+    setAvailability(val);
+    localStorage.setItem(`compass_availability_${u.handle}`, val);
+    window.dispatchEvent(new Event('compass_availability_changed'));
+  };
+
   return (
     <>
-      <PanelHeader kicker="Communities" title="My groups." sub={`You're in ${groups.length} groups.`} action={<button className="btn solid">Discover groups</button>} />
-      <div className="group-grid">
-        {groups.map(g => (
-          <article key={g.id} className="group-card" style={{ '--g-hue': g.hue }}>
-            <div className="group-deco" />
-            <div className="group-body">
-              <h3>{g.name}</h3>
-              <div className="group-meta">{g.members} members</div>
-            </div>
-            <button className="btn ghost sm">Open</button>
-          </article>
-        ))}
+      <PanelHeader
+        kicker="Account"
+        title="Edit your profile."
+        sub="What you change here is visible to everyone in the community."
+        action={<button className="btn primary">Save changes</button>}
+      />
+      <div className="dash-card">
+        <div className="edit-avatar-row">
+          <Avatar user={u} size={80} ring />
+          <div>
+            <button className="btn solid sm">Upload photo</button>
+            <button className="btn ghost sm" style={{ marginLeft: 8 }}>Remove</button>
+            <p className="field-hint" style={{ marginTop: 8 }}>PNG or JPG. Max 2MB.</p>
+          </div>
+        </div>
+
+        <div style={{ margin: '18px 0', borderBottom: '1px solid var(--border)', paddingBottom: 18 }}>
+          <label className="field-label" style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>Active Availability Status</label>
+          <select 
+            value={availability} 
+            onChange={(e) => changeAvailability(e.target.value)} 
+            className="field-input" 
+            style={{ width: '100%', maxWidth: '320px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-1)', color: 'var(--text-0)', fontFamily: 'var(--sans)' }}
+          >
+            <option value="Open to gigs">🟢 Open to Gigs (Freelance/Contract)</option>
+            <option value="Hiring">🔵 Hiring (Looking for builders)</option>
+            <option value="Mentoring">🟣 Mentoring (Open to teaching)</option>
+            <option value="Not available">⚪ Not Available (Busy/Offline)</option>
+          </select>
+          <span className="field-hint" style={{ display: 'block', marginTop: 6 }}>This badge will appear immediately on your public profile card and header.</span>
+        </div>
+
+        <div className="field-grid">
+          <Field label="Full name" value={u.name} />
+          <Field label="Handle" value={u.handle} hint="compass.community/@your-handle" />
+          <Field label="Email" value="testuser@compass.community" type="email" />
+          <Field label="Location" value={u.loc} />
+          <div style={{ gridColumn: '1 / -1' }}>
+            <Field label="Bio" value={u.bio} textarea />
+          </div>
+          <Field label="X / Twitter" value="@testuser" />
+           <Field label="Farcaster" value="testuser" />
+        </div>
       </div>
     </>
   );
 };
 
-const DashSchedule = ({ u }) => {
-  const myClasses = (window.CONFERENCES || []).filter(c => c.status !== 'ended').map(c => ({
-    day: c.status === 'live' ? 'Now' : c.when.split('·')[0].trim(),
-    time: c.status === 'live' ? 'Live' : (c.when.split('·')[1] || '').trim(),
-    title: c.title,
-    kind: c.status === 'live' ? 'Live' : 'Course',
-    cls: true,
-  }));
-  const items = [
-    ...myClasses,
-    { day: 'Jun 8', time: '6:00 PM EAT', title: 'Nairobi Builders Meetup', kind: 'IRL' },
-    { day: 'Jun 12', time: 'All week', title: 'Lagos Web3 Week', kind: 'IRL' },
+const DashGroups = ({ u }) => {
+  const groups = [
   ];
   return (
     <>
-      <PanelHeader kicker="What's next" title="My schedule." sub="Classes you registered for and events on your calendar." action={<button className="btn primary"><Icon name="plus" size={12} /> Add</button>} />
-      <div className="dash-card">
-        <ul className="schedule">
-          {items.map((it, i) => (
-            <li key={i} className="sched-row">
-              <div className="sched-day">
-                <span className="sched-d-1">{it.day}</span>
-                <span className="sched-d-2">{it.time}</span>
+      <PanelHeader kicker="Communities" title="My groups." sub={`You're in ${groups.length} groups.`} action={<button className="btn solid">Discover groups</button>} />
+      {groups.length === 0 ? (
+        <div className="empty">Not in any groups yet — discover communities to join.</div>
+      ) : (
+        <div className="group-grid">
+          {groups.map(g => (
+            <article key={g.id} className="group-card" style={{ '--g-hue': g.hue }}>
+              <div className="group-deco" />
+              <div className="group-body">
+                <h3>{g.name}</h3>
+                <div className="group-meta">{g.members} members</div>
               </div>
-              <div className="sched-body">
-                <div className="sched-title">{it.title}</div>
-                <span className={`sched-kind kind-${it.kind.toLowerCase()}`}>{it.kind}</span>
-              </div>
-              <button className={`btn ${it.kind === 'Live' ? 'primary' : 'ghost'} sm`}>{it.kind === 'Live' ? 'Join' : 'Open'}</button>
-            </li>
+              <button className="btn ghost sm">Open</button>
+            </article>
           ))}
-        </ul>
+        </div>
+      )}
+    </>
+  );
+};
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+const DashSchedule = ({ u }) => {
+  const today = new Date();
+  const [month, setMonth] = React.useState(today.getMonth());
+  const [year, setYear] = React.useState(today.getFullYear());
+  const [events, setEvents] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    conferenceService.list().then(list => {
+      setEvents(list.filter(c => c.status === 'scheduled' || c.status === 'live'));
+      setLoading(false);
+    });
+  }, []);
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const prevMonthDays = new Date(year, month, 0).getDate();
+
+  const eventMap = {};
+  events.forEach(e => {
+    if (e.scheduledISO) {
+      const d = new Date(e.scheduledISO);
+      const key = d.getDate();
+      if (!eventMap[key]) eventMap[key] = [];
+      eventMap[key].push(e);
+    }
+  });
+
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) {
+    cells.push({ day: prevMonthDays - firstDay + 1 + i, other: true });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const isToday = d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+    const hasEvents = !!eventMap[d];
+    cells.push({ day: d, other: false, isToday, hasEvents, events: eventMap[d] || [] });
+  }
+  while (cells.length % 7 !== 0) {
+    cells.push({ day: (cells.length - daysInMonth - firstDay) % 7 + 1, other: true });
+  }
+
+  const weeks = [];
+  for (let i = 0; i < cells.length; i += 7) {
+    weeks.push(cells.slice(i, i + 7));
+  }
+
+  const prev = () => {
+    if (month === 0) { setMonth(11); setYear(y => y - 1); }
+    else setMonth(m => m - 1);
+  };
+  const next = () => {
+    if (month === 11) { setMonth(0); setYear(y => y + 1); }
+    else setMonth(m => m + 1);
+  };
+
+  const todayEvents = events.filter(e => {
+    if (!e.scheduledISO) return false;
+    const d = new Date(e.scheduledISO);
+    return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+  });
+
+  const formatTime = (iso) => {
+    if (!iso) return '';
+    return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  };
+
+  const upcomingEvents = [...events].sort((a, b) => {
+    if (a.status === 'live') return -1;
+    if (b.status === 'live') return 1;
+    return new Date(a.scheduledISO) - new Date(b.scheduledISO);
+  }).slice(0, 10);
+
+  return (
+    <>
+      <PanelHeader kicker="What's next" title="My schedule." sub="Classes you registered for and events on your calendar." />
+      {loading ? (
+        <div className="empty">Loading calendar…</div>
+      ) : (
+        <div className="dash-card dash-calendar">
+          <div className="dc-head">
+            <button className="btn ghost icon-only sm" onClick={prev}><Icon name="chevron-left" size={16} /></button>
+            <span className="dc-month">{MONTHS[month]} {year}</span>
+            <button className="btn ghost icon-only sm" onClick={next}><Icon name="chevron-right" size={16} /></button>
+          </div>
+          <div className="dc-grid">
+            {DAYS.map(d => <div key={d} className="dc-day-head">{d}</div>)}
+            {weeks.flat().map((cell, i) => (
+              <div
+                key={i}
+                className={`dc-day ${cell.other ? 'other' : ''} ${cell.isToday ? 'today' : ''} ${cell.hasEvents ? 'has-ev' : ''}`}
+              >
+                <span className="dc-day-n">{cell.day}</span>
+                {cell.hasEvents && <span className="dc-day-dot" />}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {todayEvents.length > 0 && (
+        <div className="dash-card">
+          <h3 className="dash-card-title">Today</h3>
+          <ul className="dc-list">
+            {todayEvents.map(e => (
+              <li key={e.id} className={`dc-item ${e.status}`}>
+                <span className="dc-dot" style={{ background: `oklch(0.7 0.16 ${e.cover || 215})` }} />
+                <div className="dc-body">
+                  <div className="dc-item-title">{e.title}</div>
+                  <div className="dc-item-meta">
+                    {e.status === 'live' ? <span className="dc-live"><span className="space-live-pip" /> Live now</span> : formatTime(e.scheduledISO)}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="dash-card">
+        <h3 className="dash-card-title">Upcoming</h3>
+        {upcomingEvents.length === 0 ? (
+          <div className="empty-sm">No upcoming events</div>
+        ) : (
+          <ul className="dc-list">
+            {upcomingEvents.map(e => {
+              const d = e.scheduledISO ? new Date(e.scheduledISO) : null;
+              return (
+                <li key={e.id} className={`dc-item ${e.status}`}>
+                  <div className="dc-date-block">
+                    <span className="dc-date-m">{d ? MONTHS[d.getMonth()] : '—'}</span>
+                    <span className="dc-date-d">{d ? d.getDate() : '—'}</span>
+                  </div>
+                  <div className="dc-body">
+                    <div className="dc-item-title">{e.title}</div>
+                    <div className="dc-item-meta">
+                      {e.status === 'live' ? <span className="dc-live"><span className="space-live-pip" /> Live now</span> : d ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </>
   );
 };
 
 const DashCourses = ({ u }) => {
-  const courses = [
-    { title: 'ZK Fundamentals',                progress: 62, lessons: '12 / 24', hue: 195 },
-    { title: 'Solidity for production',        progress: 100, lessons: '18 / 18', hue: 145 },
-    { title: 'Account Abstraction in practice', progress: 28, lessons: '4 / 16',  hue: 290 },
-  ];
+  const attended = getAttendedClasses(u.handle);
+  const classes = CONFERENCES.filter(c => attended.includes(c.id));
+  const kpLog = getKpSummary(u.handle);
+
   return (
     <>
-      <PanelHeader kicker="Learning" title="My courses." sub="Continue where you left off." action={<button className="btn solid">Browse catalogue</button>} />
-      <div className="course-list">
-        {courses.map((c, i) => (
-          <article key={i} className="course-card">
-            <div className="course-thumb" style={{ background: `linear-gradient(135deg, oklch(0.65 0.16 ${c.hue}), oklch(0.42 0.14 ${c.hue}))` }} />
-            <div className="course-body">
-              <h3>{c.title}</h3>
-              <div className="course-meta">{c.lessons} lessons · {c.progress}%</div>
-              <div className="course-bar"><div className="course-bar-fill" style={{ width: c.progress + '%' }} /></div>
+      <PanelHeader kicker="Learning" title="My courses." sub={`${classes.length} class${classes.length !== 1 ? 'es' : ''} completed · ${kpLog.total} KP earned.`} action={<button className="btn solid">Browse catalogue</button>} />
+      {classes.length === 0 ? (
+        <div className="empty">No courses attended yet — join a live class to start learning.</div>
+      ) : (
+        <>
+          <div className="dash-card dash-kp-summary">
+            <div className="dash-kp-row">
+              <span>Total KP from classes</span>
+              <span className="dash-kp-val">+{kpLog.total}</span>
             </div>
-            <button className={`btn ${c.progress === 100 ? 'ghost' : 'primary'} sm`}>
-              {c.progress === 100 ? 'Certificate' : 'Continue'}
-            </button>
-          </article>
-        ))}
-      </div>
+          </div>
+          <div className="course-list">
+            {classes.map(c => {
+              const log = kpLog.log.find(l => l.classId === c.id);
+              return (
+                <article key={c.id} className="course-card">
+                  <div className="course-thumb" style={{ background: `linear-gradient(135deg, oklch(0.65 0.16 ${c.cover || 215}), oklch(0.42 0.14 ${c.cover || 215}))` }} />
+                  <div className="course-body">
+                    <h3>{c.title}</h3>
+                    <div className="course-meta">{c.durationMin} min · {log ? `+${log.kp} KP` : 'Attended'}</div>
+                    <div className="course-bar"><div className="course-bar-fill" style={{ width: '100%' }} /></div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </>
+      )}
     </>
   );
 };
 
 const DashContributions = ({ u, navigate }) => {
-  const posts = TOPICS.filter(t => t.author === u.handle);
   return (
     <>
       <PanelHeader kicker="Your activity" title="My contributions." sub="Every post, reply, validation and bounty submission." />
       <div className="dash-stats">
-        {[['12','Posts'], ['238','Replies'], ['14','Validated alphas'], ['1,420','KP earned']].map(([n,l]) => (
+        {[['0','Posts'], ['0','Replies'], ['0','Validated alphas'], ['0','KP earned']].map(([n,l]) => (
           <div key={l} className="ds-cell"><div className="ds-n">{n}</div><div className="ds-l">{l}</div></div>
         ))}
       </div>
-      {posts.length === 0
-        ? <div className="empty">Nothing yet — let's change that.</div>
-        : <div className="discussion-card">
-            {posts.map(t => <TopicRow key={t.id} topic={t} navigate={navigate} />)}
-          </div>}
+      <div className="empty">Nothing yet — let's change that.</div>
     </>
   );
 };
 
 const DashCertificates = ({ u }) => {
   const certs = [
-    { title: 'Solidity for production',         issued: 'Apr 2026', hue: 145 },
-    { title: 'On-chain compliance fundamentals', issued: 'Feb 2026', hue: 290 },
-    { title: 'Compass Voice of Impact · Jan',    issued: 'Jan 2026', hue: 340 },
   ];
   return (
     <>
       <PanelHeader kicker="Receipts" title="My certificates." action={<button className="btn solid">Verify on-chain</button>} />
-      <div className="cert-grid">
-        {certs.map((c, i) => (
-          <article key={i} className="cert-card" style={{ '--c-hue': c.hue }}>
-            <div className="cert-deco" />
-            <Icon name="medal" size={28} />
-            <h3>{c.title}</h3>
-            <div className="cert-meta">Issued {c.issued}</div>
-            <button className="btn ghost sm">Download PDF</button>
-          </article>
-        ))}
-      </div>
+      {certs.length === 0 ? (
+        <div className="empty">No certificates yet — complete training courses to earn them.</div>
+      ) : (
+        <div className="cert-grid">
+          {certs.map((c, i) => (
+            <article key={i} className="cert-card" style={{ '--c-hue': c.hue }}>
+              <div className="cert-deco" />
+              <Icon name="medal" size={28} />
+              <h3>{c.title}</h3>
+              <div className="cert-meta">Issued {c.issued}</div>
+              <button className="btn ghost sm">Download PDF</button>
+            </article>
+          ))}
+        </div>
+      )}
     </>
   );
 };
@@ -584,36 +1082,40 @@ const LeaderboardPage = ({ navigate }) => {
 };
 
 // ---------- Events ----------
-const EventsPage = ({ navigate, registered, onRegister, onJoin }) => {
-  const liveClasses = CONFERENCES.filter(c => c.status === 'live');
-  const upcomingClasses = CONFERENCES.filter(c => c.status === 'scheduled');
-  const replayClasses = CONFERENCES.filter(c => c.status === 'ended');
-  const events = [
-    { title: 'Lagos Web3 Week', date: 'Jun 12–15', loc: 'Lagos, NG', kind: 'IRL', host: 'kelechi.eth', going: 312, from: '#1a2444', to: '#3d2a6e' },
-    { title: 'AMA: Base ecosystem fund', date: 'Tue · 7pm WAT', loc: 'Discord stage', kind: 'Live', host: 'compass.eth', going: 184, from: '#0052ff', to: '#5b8fff' },
-    { title: 'ZK Fundamentals — cohort start', date: 'Jun 3', loc: 'Online', kind: 'Course', host: 'compass.eth', going: 96, from: '#cfe6b8', to: '#7fb86b' },
-    { title: 'Nairobi Builders Meetup', date: 'Jun 8 · 6pm EAT', loc: 'iHub, Nairobi', kind: 'IRL', host: 'degenscout', going: 78, from: '#f7705a', to: '#c4350f' },
-    { title: 'On-chain rep systems — panel', date: 'Jun 18', loc: 'Online', kind: 'Live', host: 'mosi_dao', going: 142, from: '#b89ef0', to: '#6446b0' },
-    { title: 'Voice of Impact: June livestream', date: 'Jun 28 · 5pm WAT', loc: 'YouTube live', kind: 'Live', host: 'fatima.lens', going: 220, from: '#f0c1c9', to: '#c4707c' },
-    { title: 'Accra Hack Night', date: 'Jul 5', loc: 'Accra, GH', kind: 'IRL', host: 'nana_btc', going: 64, from: '#efb742', to: '#a87900' },
-    { title: 'AA workshop — production', date: 'Jul 9', loc: 'Online', kind: 'Live', host: 'kweku.sol', going: 88, from: '#7da19a', to: '#3d6058' },
-  ];
+const EventsPage = ({ navigate, currentUser, registered, onRegister, onJoin, onSchedule }) => {
+  const [classes, setClasses] = React.useState([]);
+  React.useEffect(() => { conferenceService.list().then(setClasses); }, []);
+
+  const canView = canViewCategory(currentUser, 'events');
+  const liveClasses = classes.filter(c => c.status === 'live');
+  const upcomingClasses = classes.filter(c => c.status === 'scheduled');
+  const replayClasses = classes.filter(c => c.status === 'ended');
+  if (!canView) {
+    return (
+      <div className="view events">
+        <section className="lb-hero">
+          <div className="section-eyebrow"><span className="section-eyebrow-dot" /> Calendar · 07 / 08</div>
+        </section>
+        <div className="category-locked-panel" style={{ marginTop: 40 }}>
+          <h2>Content locked</h2>
+          <p>Reach {requiredLevelLabel(getCategoryAccess('events').view)} to view events.</p>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="view events">
       <section className="lb-hero">
         <div className="section-eyebrow"><span className="section-eyebrow-dot" /> Calendar · 07 / 08</div>
-        <h1 className="section-title" style={{ fontSize: 'clamp(36px, 4vw, 56px)' }}>Events worth showing up for.</h1>
-        <p className="section-sub">
-          IRL meetups, AMAs, live cohorts and panels — from Lagos to Nairobi, on-chain and on-stage.
-        </p>
+        {canCreateEvent(currentUser) && (
         <div className="lb-tabs">
-          <button className="btn primary"><Icon name="plus" size={12} /> Submit event</button>
+          <button className="btn primary" onClick={onSchedule}><Icon name="plus" size={12} /> Submit event</button>
           <button className="btn ghost">All hosts</button>
           <button className="btn ghost">Past events</button>
         </div>
+        )}
       </section>
 
-      {/* Live + upcoming classes (hosted in Studio) */}
       <FadeUp>
         <div className="section-head" style={{ marginBottom: 16, marginTop: 8 }}>
           <div>
@@ -623,33 +1125,7 @@ const EventsPage = ({ navigate, registered, onRegister, onJoin }) => {
         </div>
         <div className="class-grid">
           {[...liveClasses, ...upcomingClasses, ...replayClasses].map(c => (
-            <ClassCard key={c.id} cls={c} registered={registered} onRegister={onRegister} onJoin={onJoin} />
-          ))}
-        </div>
-      </FadeUp>
-
-      <FadeUp>
-        <div className="section-head" style={{ marginBottom: 16, marginTop: 8 }}>
-          <div>
-            <div className="section-eyebrow"><span className="section-eyebrow-dot" /> Community calendar</div>
-            <h2 className="section-title" style={{ fontSize: 'clamp(24px,2.6vw,32px)' }}>Meetups & gatherings.</h2>
-          </div>
-        </div>
-        <div className="ev-grid">
-          {events.map(e => (
-            <article key={e.title} className="event-card" style={{ '--ev-from': e.from, '--ev-to': e.to, flex: 'unset', height: 340 }}>
-              <div className="event-cover">
-                <span className="event-badge">{e.kind}</span>
-                <div className="event-cover-title">{e.title}</div>
-              </div>
-              <div className="event-card-body">
-                <h3 className="event-card-title">{e.loc}</h3>
-                <div className="event-card-meta">
-                  <span>{e.date}</span>
-                  <span className="ec-going"><Icon name="users" size={11} /> {e.going}</span>
-                </div>
-              </div>
-            </article>
+            <ClassCard key={c.id} cls={c} currentUser={currentUser} registered={registered} onRegister={onRegister} onJoin={onJoin} />
           ))}
         </div>
       </FadeUp>
@@ -658,8 +1134,8 @@ const EventsPage = ({ navigate, registered, onRegister, onJoin }) => {
 };
 
 // ---------- Tag page ----------
-const TagPage = ({ tag, navigate }) => {
-  const topics = TOPICS.filter(t => t.tags.includes(tag));
+const TagPage = ({ tag, navigate, currentUser }) => {
+  const topics = TOPICS.filter(t => t.tags.includes(tag) && canViewTopic(currentUser, t));
   return (
     <div className="view tag">
       <section className="tag-hero">
@@ -676,12 +1152,100 @@ const TagPage = ({ tag, navigate }) => {
 };
 
 // ---------- Composer Modal ----------
-const Composer = ({ onClose, defaultCat }) => {
-  const [cat, setCat] = React.useState(defaultCat || 'news');
-  const [title, setTitle] = React.useState('');
-  const [body, setBody] = React.useState('');
-  const [tags, setTags] = React.useState([]);
+const COMPOSER_DRAFT_KEY = 'compass_modal_draft_v1';
+
+const Composer = ({ onClose, defaultCat, currentUser }) => {
+  const [cat, setCat] = React.useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(COMPOSER_DRAFT_KEY));
+      return saved?.cat || defaultCat || 'news';
+    } catch {
+      return defaultCat || 'news';
+    }
+  });
+
+  const postableCategories = currentUser ? CATEGORIES.filter(c => canPostCategory(currentUser, c.id)) : CATEGORIES;
+
+  React.useEffect(() => {
+    if (postableCategories.length > 0 && !postableCategories.find(c => c.id === cat)) {
+      setCat(postableCategories[0].id);
+    }
+  }, [cat, postableCategories]);
+
+  const [title, setTitle] = React.useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(COMPOSER_DRAFT_KEY));
+      return saved?.title || '';
+    } catch {
+      return '';
+    }
+  });
+
+  const [body, setBody] = React.useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(COMPOSER_DRAFT_KEY));
+      return saved?.body || '';
+    } catch {
+      return '';
+    }
+  });
+
+  const [postType, setPostType] = React.useState('discussion');
+  const blogLevel = 3;
+  const userLevel = getUserLevel(currentUser);
+  const canBlog = userLevel >= blogLevel;
+  const blogLevelName = getLevelName(blogLevel);
+
+  const [tags, setTags] = React.useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(COMPOSER_DRAFT_KEY));
+      return saved?.tags || [];
+    } catch {
+      return [];
+    }
+  });
+
   const currentCat = CATEGORIES.find(c => c.id === cat);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(COMPOSER_DRAFT_KEY, JSON.stringify({ cat, title, body, tags, postType }));
+    } catch {}
+  }, [cat, title, body, tags, postType]);
+
+  const clearDraft = () => {
+    setTitle('');
+    setBody('');
+    setTags([]);
+    setPostType('discussion');
+    try {
+      localStorage.removeItem(COMPOSER_DRAFT_KEY);
+    } catch {}
+  };
+
+  const handlePublish = async () => {
+    if (!canPostCategory(currentUser, cat) && !currentUser.id) return;
+    if (postType === 'blog' && !canBlog && !currentUser.id) return;
+    const finalTitle = postType === 'blog' ? `[Blog] ${title}` : title;
+
+    // If using Supabase, create a real post
+    if (currentUser.id && window.supabaseService) {
+      try {
+        await supabaseService.createPost({
+          title: finalTitle,
+          body,
+          type: postType === 'blog' ? 'Resource' : 'Signal',
+          cat,
+          media: null,
+        });
+      } catch (e) {
+        console.error('Failed to publish:', e);
+      }
+    }
+
+    clearDraft();
+    onClose();
+  };
 
   const toggleTag = (t) => setTags(curr => curr.includes(t) ? curr.filter(x=>x!==t) : [...curr, t]);
 
@@ -697,7 +1261,7 @@ const Composer = ({ onClose, defaultCat }) => {
         <div className="modal-body">
           <label className="cf-label">Category</label>
           <div className="cat-picker">
-            {CATEGORIES.map(c => {
+            {postableCategories.map(c => {
               const meta = CAT_META[c.id];
               return (
                 <button key={c.id} className={`cat-opt ${cat===c.id?'active':''}`} onClick={() => setCat(c.id)}>
@@ -707,6 +1271,19 @@ const Composer = ({ onClose, defaultCat }) => {
                 </button>
               );
             })}
+          </div>
+
+          <label className="cf-label">Type</label>
+          <div className="cat-picker">
+            <button className={`cat-opt ${postType==='discussion'?'active':''}`} onClick={() => setPostType('discussion')}>
+              <span className="cat-opt-dot" style={{ background: '#888' }} />
+              <span className="cat-opt-name">Discussion</span>
+            </button>
+            <button className={`cat-opt ${postType==='blog'?'active':''}`} onClick={() => canBlog && setPostType('blog')} style={{ opacity: canBlog ? 1 : 0.5 }}>
+              <span className="cat-opt-dot" style={{ background: canBlog ? 'var(--brand-yellow)' : '#666' }} />
+              <span className="cat-opt-name">Blog</span>
+              {!canBlog && <span className="cat-opt-lock" style={{ fontSize: 10, color: 'var(--text-3)', marginLeft: 6, display: 'inline-flex', alignItems: 'center', gap: 3 }}><Icon name="lock" size={10} /> {blogLevelName} · Level {blogLevel}+</span>}
+            </button>
           </div>
 
           <label className="cf-label">Title</label>
@@ -725,8 +1302,11 @@ const Composer = ({ onClose, defaultCat }) => {
         <div className="modal-foot">
           <span className="mf-hint">{currentCat?.premium ? '✦ Premium category — Navigator tier and above can post here.' : 'Posting publicly to the community.'}</span>
           <div className="mf-right">
+            {(title.trim() || body.trim()) && (
+              <button className="btn ghost danger-soft-text" style={{ marginRight: 8, color: '#c4350f' }} onClick={clearDraft}>Clear</button>
+            )}
             <button className="btn ghost" onClick={onClose}>Save draft</button>
-            <button className="btn primary" disabled={!title.trim()}>
+            <button className="btn primary" disabled={!title.trim()} onClick={handlePublish}>
               <Icon name="send" size={12} /> Publish
             </button>
           </div>

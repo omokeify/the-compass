@@ -46,7 +46,7 @@ const SignupModal = ({ onClose, onComplete }) => {
                 </ul>
               </div>
               <div className="sb-foot">
-                <AvatarStack handles={['compass.eth','degenscout','0xforesight','kelechi.eth','fatima.lens']} size={28} max={5} />
+                <AvatarStack handles={['testuser']} size={28} max={5} />
                 <div>
                   <strong>Joined this week</strong>
                   <span>318 new builders.</span>

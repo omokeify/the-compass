@@ -16,12 +16,11 @@ function routeFromPath(pathname = window.location.pathname) {
   if (root === 'talent') return a ? { view: 'gig', id: a } : { view: 'talent' };
   if (root === 'gigs') return a ? { view: 'gig', id: a } : { view: 'talent' };
   if (root === 'spaces') return { view: 'spaces' };
+  if (root === 'content') return { view: 'content' };
   if (root === 'members') return { view: 'members' };
   if (root === 'messages') return { view: 'messages' };
   if (root === 'studio') return { view: 'studio' };
   if (root === 'leaderboard') return { view: 'leaderboard' };
-  if (root === 'pro') return { view: 'pro' };
-  if (root === 'bounties') return { view: 'bounties' };
   if (root === 'events') return { view: 'events' };
   if (root === 'topics' && a) return { view: 'topic', topic: a };
   if (root === 'categories' && a) return { view: 'category', cat: a };
@@ -40,12 +39,11 @@ function routeToPath(route = DEFAULT_ROUTE) {
   if (route.view === 'talent') return '/talent';
   if (route.view === 'gig') return `/talent/${enc(route.id)}`;
   if (route.view === 'spaces') return '/spaces';
+  if (route.view === 'content') return '/content';
   if (route.view === 'members') return '/members';
   if (route.view === 'messages') return '/messages';
   if (route.view === 'studio') return '/studio';
   if (route.view === 'leaderboard') return '/leaderboard';
-  if (route.view === 'pro') return '/pro';
-  if (route.view === 'bounties') return '/bounties';
   if (route.view === 'events') return '/events';
   if (route.view === 'topic') return `/topics/${enc(route.topic)}`;
   if (route.view === 'category') return `/categories/${enc(route.cat)}`;
@@ -53,7 +51,8 @@ function routeToPath(route = DEFAULT_ROUTE) {
   if (route.view === 'article') return `/articles/${enc(route.id)}`;
   if (route.view === 'profile') {
     const tab = route.tab ? `/${enc(route.tab)}` : '';
-    return `/profile/${enc(route.handle || 'kelechi.eth')}${tab}`;
+    const fallbackHandle = route.handle || (window.currentUser && window.currentUser.handle) || 'testuser';
+    return `/profile/${enc(fallbackHandle)}${tab}`;
   }
 
   return '/';

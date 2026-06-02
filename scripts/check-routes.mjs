@@ -4,7 +4,7 @@ const cases = [
   ['/', DEFAULT_ROUTE],
   ['/feed', { view: 'feed' }],
   ['/spaces', { view: 'spaces' }],
-  ['/profile/kelechi.eth/saved', { view: 'profile', handle: 'kelechi.eth', tab: 'saved' }],
+  ['/profile/testuser/saved', { view: 'profile', handle: 'testuser', tab: 'saved' }],
   ['/topics/t1', { view: 'topic', topic: 't1' }],
   ['/categories/alpha', { view: 'category', cat: 'alpha' }],
   ['/tags/airdrops', { view: 'tag', tag: 'airdrops' }],

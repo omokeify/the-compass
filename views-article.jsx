@@ -1,42 +1,7 @@
 // Blog-style article detail page (for editorial content)
 
 // Shared sample article body — sections used to render + build the ToC
-const ARTICLE_SECTIONS = [
-  {
-    h: 'The Infrastructure Layer',
-    p: [
-      'Stablecoins have quietly become the most important layer of the on-chain economy. For developers building cross-border payment tools, remittance products, or SME finance applications, the question is no longer "should we use stablecoins?" — it\'s "which rails, which liquidity, and which compliance path?"',
-      'The past 18 months have seen a meaningful shift in how builders approach this infrastructure. Rather than treating stablecoins as a speculative asset class, the most sophisticated teams now treat USDC and the growing family of regional stablecoins as programmable cash — composable with contracts, readable on-chain, and settled in near real time.',
-    ],
-  },
-  {
-    h: 'Who Is Building',
-    p: [
-      'Across The Compass community, we\'ve tracked a growing cluster of builders — primarily from West Africa, Southeast Asia, and Latin America — who are shipping stablecoin-native products for corridors that legacy fintech underserves.',
-    ],
-    quote: { body: 'The SWIFT system adds 2–3 days and 5–8% in fees to every remittance we used to do. With USDC on Base, we\'re settling the same transaction in 3 seconds for less than a cent.', by: 'Builder, Lagos cohort' },
-  },
-  {
-    h: 'Payment Corridors',
-    p: [
-      'The most active corridors we\'re seeing: Nigeria → UK, Philippines → US, India → UAE, and Mexico → US. Each has its own regulatory texture, but the pattern rhymes: a stablecoin on-ramp on one side, a local off-ramp partner on the other, and a thin layer of compliance tooling in between.',
-      'What\'s changed is the off-ramp density. Partners like Yellow Card and a wave of regional PSPs now make the "last mile" — getting value into a local bank account or mobile wallet — fast enough that end users never see the crypto underneath.',
-    ],
-  },
-  {
-    h: 'Key Protocols',
-    p: [
-      'On the settlement side, Base and Solana dominate new builds for their fees and finality. For programmable flows — escrow, streaming payroll, conditional release — teams lean on account abstraction so users sign with a passkey instead of managing a seed phrase.',
-    ],
-  },
-  {
-    h: 'What Comes Next',
-    p: [
-      'The next frontier is interoperability between regional stablecoins and a credible, on-chain compliance standard that satisfies both local regulators and global partners. The teams that solve the compliance UX — not just the settlement tech — will own the corridors.',
-      'The Compass will keep tracking this cohort. If you\'re building here, post in the Partnership category — we\'ll feature the most interesting work.',
-    ],
-  },
-];
+const ARTICLE_SECTIONS = [];
 
 const ArticlePage = ({ id, navigate }) => {
   const item = (window.CONTENT_ITEMS || []).find(c => c.id === id) || CONTENT_ITEMS[0];
