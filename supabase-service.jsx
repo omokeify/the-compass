@@ -797,6 +797,62 @@ const supabaseService = {
     const rows = await res.json();
     return rows.map(r => r.conference_id);
   },
+
+  // ===== Notifications =====
+  async getNotifications() {
+    const session = getSession();
+    if (!session?.user?.id) return [];
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/notifications?user_id=eq.${session.user.id}&order=created_at.desc&limit=50`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async getUnreadCount() {
+    const session = getSession();
+    if (!session?.user?.id) return 0;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/notifications?user_id=eq.${session.user.id}&unread=eq.true&select=id&limit=100`, { headers: authHeaders() });
+    if (!res.ok) return 0;
+    const data = await res.json();
+    return data?.length || 0;
+  },
+
+  async markNotificationRead(id) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/notifications?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ unread: false }),
+    });
+    return res.ok;
+  },
+
+  async markAllNotificationsRead() {
+    const session = getSession();
+    if (!session?.user?.id) return;
+    await fetch(`${SUPABASE_URL}/rest/v1/notifications?user_id=eq.${session.user.id}&unread=eq.true`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ unread: false }),
+    });
+  },
+
+  async createNotification(kind, text, target, targetId) {
+    const session = getSession();
+    if (!session?.user?.id) throw new Error('Not authenticated');
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/notifications`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        user_id: session.user.id,
+        kind,
+        actor_id: session.user.id,
+        actor_handle: session.user.user_metadata?.handle || 'user',
+        text,
+        target: target || '',
+        target_id: targetId || '',
+      }),
+    });
+    return res.ok;
+  },
 };
 
 Object.assign(window, { supabaseService });

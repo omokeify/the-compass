@@ -480,3 +480,156 @@ CREATE POLICY "Users can view own kp_log"
 CREATE POLICY "Users can insert own kp_log"
   ON public.kp_log FOR INSERT
   WITH CHECK (auth.role() = 'authenticated' AND user_id = auth.uid());
+
+-- =============================================================
+-- 8. Notifications
+-- =============================================================
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL DEFAULT '',
+  actor_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  actor_handle TEXT NOT NULL DEFAULT '',
+  text TEXT NOT NULL DEFAULT '',
+  target TEXT DEFAULT '',
+  target_id TEXT DEFAULT '',
+  unread BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own notifications"
+  ON public.notifications FOR SELECT
+  USING (auth.role() = 'authenticated' AND user_id = auth.uid());
+
+CREATE POLICY "Users can update own notifications"
+  ON public.notifications FOR UPDATE
+  USING (auth.role() = 'authenticated' AND user_id = auth.uid());
+
+CREATE POLICY "Users can insert notifications"
+  ON public.notifications FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- =============================================================
+-- 8. Notifications (auto-created by DB triggers)
+-- =============================================================
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  actor_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  actor_handle TEXT DEFAULT '',
+  text TEXT DEFAULT '',
+  target TEXT DEFAULT '',
+  target_id TEXT DEFAULT '',
+  unread BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notif_user ON public.notifications(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notif_unread ON public.notifications(user_id) WHERE unread = true;
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own notifications"
+  ON public.notifications FOR SELECT
+  USING (auth.role() = 'authenticated' AND user_id = auth.uid());
+
+CREATE POLICY "Users can update own notifications"
+  ON public.notifications FOR UPDATE
+  USING (user_id = auth.uid());
+
+-- Auto-create notification on follow
+CREATE OR REPLACE FUNCTION public.notify_on_follow()
+RETURNS TRIGGER AS $$
+DECLARE
+  actor_handle TEXT;
+BEGIN
+  IF NEW.follower_id = NEW.following_id THEN RETURN NEW; END IF;
+  SELECT handle INTO actor_handle FROM public.profiles WHERE id = NEW.follower_id;
+  INSERT INTO public.notifications (user_id, kind, actor_id, actor_handle, text)
+  VALUES (NEW.following_id, 'follow', NEW.follower_id, COALESCE(actor_handle, 'someone'), 'followed you');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_notify_on_follow ON public.follows;
+CREATE TRIGGER trg_notify_on_follow
+  AFTER INSERT ON public.follows
+  FOR EACH ROW EXECUTE FUNCTION public.notify_on_follow();
+
+-- Auto-create notification on reaction (like)
+CREATE OR REPLACE FUNCTION public.notify_on_reaction()
+RETURNS TRIGGER AS $$
+DECLARE
+  post_author UUID;
+  post_title TEXT;
+  actor_handle TEXT;
+BEGIN
+  SELECT author_id, COALESCE(title, 'a post') INTO post_author, post_title
+    FROM public.posts WHERE id = NEW.post_id;
+  IF NOT FOUND THEN RETURN NEW; END IF;
+  IF NEW.user_id = post_author THEN RETURN NEW; END IF;
+  SELECT handle INTO actor_handle FROM public.profiles WHERE id = NEW.user_id;
+  INSERT INTO public.notifications (user_id, kind, actor_id, actor_handle, text, target, target_id)
+  VALUES (post_author, 'like', NEW.user_id, COALESCE(actor_handle, 'someone'), 'liked your post', post_title, NEW.post_id::text);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_notify_on_reaction ON public.reactions;
+CREATE TRIGGER trg_notify_on_reaction
+  AFTER INSERT ON public.reactions
+  FOR EACH ROW EXECUTE FUNCTION public.notify_on_reaction();
+
+-- Auto-create notification on comment (reply)
+CREATE OR REPLACE FUNCTION public.notify_on_comment()
+RETURNS TRIGGER AS $$
+DECLARE
+  post_author UUID;
+  post_title TEXT;
+  actor_handle TEXT;
+BEGIN
+  SELECT author_id, COALESCE(title, 'a post') INTO post_author, post_title
+    FROM public.posts WHERE id = NEW.post_id;
+  IF NOT FOUND THEN RETURN NEW; END IF;
+  IF NEW.author_id = post_author THEN RETURN NEW; END IF;
+  SELECT handle INTO actor_handle FROM public.profiles WHERE id = NEW.author_id;
+  INSERT INTO public.notifications (user_id, kind, actor_id, actor_handle, text, target, target_id)
+  VALUES (post_author, 'reply', NEW.author_id, COALESCE(actor_handle, 'someone'), 'replied to your post', post_title, NEW.post_id::text);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_notify_on_comment ON public.comments;
+CREATE TRIGGER trg_notify_on_comment
+  AFTER INSERT ON public.comments
+  FOR EACH ROW EXECUTE FUNCTION public.notify_on_comment();
+
+-- Auto-create notification on new message
+CREATE OR REPLACE FUNCTION public.notify_on_message()
+RETURNS TRIGGER AS $$
+DECLARE
+  conv_participants JSONB;
+  participant UUID;
+  actor_handle TEXT;
+BEGIN
+  SELECT participants INTO conv_participants FROM public.conversations WHERE id = NEW.conversation_id;
+  IF conv_participants IS NULL THEN RETURN NEW; END IF;
+  SELECT handle INTO actor_handle FROM public.profiles WHERE id = NEW.sender_id;
+  FOR participant IN SELECT jsonb_array_elements_text(conv_participants)::UUID
+  LOOP
+    IF participant != NEW.sender_id THEN
+      INSERT INTO public.notifications (user_id, kind, actor_id, actor_handle, text)
+      VALUES (participant, 'message', NEW.sender_id, COALESCE(actor_handle, 'someone'), 'sent you a message');
+    END IF;
+  END LOOP;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_notify_on_message ON public.messages;
+CREATE TRIGGER trg_notify_on_message
+  AFTER INSERT ON public.messages
+  FOR EACH ROW EXECUTE FUNCTION public.notify_on_message();

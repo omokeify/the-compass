@@ -90,6 +90,7 @@ function App() {
     setLoggedIn(true);
     if (onboardNext) setOnboard(true);
     navigate({ view: onboardNext ? 'feed' : 'home' });
+    window.__notifRefresh?.();
   };
 
   const signUp = async ({ email, password, name, handle }) => {
@@ -104,6 +105,7 @@ function App() {
       setLoggedIn(true);
       setOnboard(true);
       navigate({ view: 'feed' });
+      window.__notifRefresh?.();
     } catch (e) {
       showToast(e.message || 'Sign up failed');
     }

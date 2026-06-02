@@ -123,15 +123,15 @@ const FeedPoll = ({ poll }) => {
 };
 
 const InlineFeedComposer = ({ onCompose, currentUser }) => {
-  const [draft, setDraft] = React.useState('');
+  const [draft, setDraft] = React.useState({ body: '', type: 'Signal' });
   const [postType, setPostType] = React.useState('Signal');
 
   React.useEffect(() => {
-    try { const saved = localStorage.getItem('compass_feed_draft_v1'); if (saved) setDraft(saved); } catch {}
+    try { const saved = localStorage.getItem('compass_feed_draft_v1'); if (saved) setDraft(JSON.parse(saved)); } catch {}
   }, []);
 
   React.useEffect(() => {
-    try { localStorage.setItem('compass_feed_draft_v1', draft); } catch {}
+    try { localStorage.setItem('compass_feed_draft_v1', JSON.stringify(draft)); } catch {}
   }, [draft]);
 
   return (

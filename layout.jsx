@@ -185,6 +185,13 @@ const ProfileDropdown = ({ currentUser, onNavigate, onClose, onLogout }) => {
 
 // ---------- TopBar ----------
 const TopBar = ({ route, navigate, onCompose, currentUser, onOpenNotifs, onOpenSearch, onLogout }) => {
+  const [notifCount, setNotifCount] = React.useState(0);
+  React.useEffect(() => {
+    setNotifCount(window.__notifUnreadCount || 0);
+    const handler = () => setNotifCount(window.__notifUnreadCount || 0);
+    window.addEventListener('compass_notif_refresh', handler);
+    return () => window.removeEventListener('compass_notif_refresh', handler);
+  }, []);
   const [query, setQuery] = React.useState('');
   const [scrolled, setScrolled] = React.useState(false);
   const [profileOpen, setProfileOpen] = React.useState(false);
@@ -264,8 +271,10 @@ const TopBar = ({ route, navigate, onCompose, currentUser, onOpenNotifs, onOpenS
           <kbd className="kbd">⌘K</kbd>
         </button>
         <button className="btn ghost icon-only" title="Notifications" onClick={onOpenNotifs}>
-          <Icon name="bell" size={16} />
-          <span className="notif-dot" />
+          <div className="bell-wrap">
+            <Icon name="bell" size={16} />
+            {notifCount > 0 && <span className="notif-badge">{notifCount > 99 ? '99+' : notifCount}</span>}
+          </div>
         </button>
         <button className="btn primary" onClick={onCompose}>
           <Icon name="plus" size={14} /> New post

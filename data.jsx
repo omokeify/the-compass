@@ -1106,6 +1106,21 @@ Object.assign(window, {
   canViewTopic, canReplyTopic, requiredLevelLabel,
 });
 
+window.__notifUnreadCount = 0;
+window.__notifRefresh = async () => {
+  const sb = _sb();
+  if (!sb) return;
+  try {
+    const [notifs, count] = await Promise.all([
+      sb.getNotifications(),
+      sb.getUnreadCount(),
+    ]);
+    if (Array.isArray(notifs)) { NOTIFICATIONS.length = 0; NOTIFICATIONS.push(...notifs); }
+    window.__notifUnreadCount = count;
+    window.dispatchEvent(new Event('compass_notif_refresh'));
+  } catch {}
+};
+
 const COMPASS_LIVE_TICK_MS = 3000;
 
 if (!window.__compass_poller_running) {
@@ -1114,9 +1129,10 @@ if (!window.__compass_poller_running) {
     const session = window.supabaseService?.getSession()?.access_token;
     if (!session) return;
     try {
-      const [spaces, conferences] = await Promise.all([
+      const [spaces, conferences, notifs] = await Promise.all([
         spaceService.list(),
         conferenceService.list(),
+        window.__notifRefresh(),
       ]);
       if (Array.isArray(spaces)) { SPACES.length = 0; SPACES.push(...spaces); window.dispatchEvent(new Event('compass_spaces_refresh')); }
       if (Array.isArray(conferences)) { CONFERENCES.length = 0; CONFERENCES.push(...conferences); window.dispatchEvent(new Event('compass_conferences_refresh')); }
