@@ -84,66 +84,81 @@ ALTER TABLE public.reactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.follows ENABLE ROW LEVEL SECURITY;
 
 -- Profiles: public profiles are readable by anyone, only owner can update
+DROP POLICY IF EXISTS "Profiles are public" ON public.profiles;
 CREATE POLICY "Profiles are public"
   ON public.profiles FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile"
   ON public.profiles FOR UPDATE
   USING (auth.uid() = id);
 
 -- Posts: readable by all, insertable by authenticated users
+DROP POLICY IF EXISTS "Posts are public" ON public.posts;
 CREATE POLICY "Posts are public"
   ON public.posts FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Authenticated users can create posts" ON public.posts;
 CREATE POLICY "Authenticated users can create posts"
   ON public.posts FOR INSERT
   WITH CHECK (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authors can update own posts" ON public.posts;
 CREATE POLICY "Authors can update own posts"
   ON public.posts FOR UPDATE
   USING (auth.uid() = author_id);
 
+DROP POLICY IF EXISTS "Authors can delete own posts" ON public.posts;
 CREATE POLICY "Authors can delete own posts"
   ON public.posts FOR DELETE
   USING (auth.uid() = author_id);
 
 -- Comments: readable by all, insertable by authenticated users
+DROP POLICY IF EXISTS "Comments are public" ON public.comments;
 CREATE POLICY "Comments are public"
   ON public.comments FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Authenticated users can comment" ON public.comments;
 CREATE POLICY "Authenticated users can comment"
   ON public.comments FOR INSERT
   WITH CHECK (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authors can delete own comments" ON public.comments;
 CREATE POLICY "Authors can delete own comments"
   ON public.comments FOR DELETE
   USING (auth.uid() = author_id);
 
 -- Reactions: readable by all, manageable by owner
+DROP POLICY IF EXISTS "Reactions are public" ON public.reactions;
 CREATE POLICY "Reactions are public"
   ON public.reactions FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Users can manage own reactions" ON public.reactions;
 CREATE POLICY "Users can manage own reactions"
   ON public.reactions FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own reactions" ON public.reactions;
 CREATE POLICY "Users can delete own reactions"
   ON public.reactions FOR DELETE
   USING (auth.uid() = user_id);
 
 -- Follows: readable by all, manageable by follower
+DROP POLICY IF EXISTS "Follows are public" ON public.follows;
 CREATE POLICY "Follows are public"
   ON public.follows FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Users can manage own follows" ON public.follows;
 CREATE POLICY "Users can manage own follows"
   ON public.follows FOR INSERT
   WITH CHECK (auth.uid() = follower_id);
 
+DROP POLICY IF EXISTS "Users can unfollow" ON public.follows;
 CREATE POLICY "Users can unfollow"
   ON public.follows FOR DELETE
   USING (auth.uid() = follower_id);
@@ -166,3 +181,90 @@ LEFT JOIN (SELECT post_id, COUNT(*) AS like_count FROM public.reactions WHERE ty
 LEFT JOIN (SELECT post_id, COUNT(*) AS comment_count FROM public.comments GROUP BY post_id) c ON p.id = c.post_id
 LEFT JOIN (SELECT post_id, COUNT(*) AS repost_count FROM public.reactions WHERE type = 'repost' GROUP BY post_id) r ON p.id = r.post_id
 ORDER BY p.created_at DESC;
+
+-- 9. Conferences / Classes
+CREATE TABLE IF NOT EXISTS public.conferences (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  cat TEXT DEFAULT 'training',
+  host TEXT NOT NULL,
+  cohosts JSONB DEFAULT '[]'::jsonb,
+  stage JSONB DEFAULT '[]'::jsonb,
+  status TEXT DEFAULT 'scheduled',
+  when_text TEXT DEFAULT '',
+  scheduled_iso TIMESTAMPTZ,
+  duration_min INTEGER DEFAULT 60,
+  capacity INTEGER DEFAULT 150,
+  registered INTEGER DEFAULT 0,
+  registrants JSONB DEFAULT '[]'::jsonb,
+  attendees JSONB DEFAULT '[]'::jsonb,
+  recorded BOOLEAN DEFAULT true,
+  publish_events BOOLEAN DEFAULT true,
+  notify BOOLEAN DEFAULT true,
+  cover INTEGER DEFAULT 215,
+  attended INTEGER DEFAULT 0,
+  chat JSONB DEFAULT '[]'::jsonb,
+  board_strokes JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.conferences ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Conferences are public" ON public.conferences;
+CREATE POLICY "Conferences are public"
+  ON public.conferences FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "Authenticated users can create conferences" ON public.conferences;
+CREATE POLICY "Authenticated users can create conferences"
+  ON public.conferences FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Hosts can update own conferences" ON public.conferences;
+CREATE POLICY "Hosts can update own conferences"
+  ON public.conferences FOR UPDATE
+  USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Hosts can delete own conferences" ON public.conferences;
+CREATE POLICY "Hosts can delete own conferences"
+  ON public.conferences FOR DELETE
+  USING (auth.role() = 'authenticated');
+
+-- 10. Spaces (live audio rooms)
+CREATE TABLE IF NOT EXISTS public.spaces (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  host TEXT NOT NULL,
+  cohosts JSONB DEFAULT '[]'::jsonb,
+  speakers JSONB DEFAULT '[]'::jsonb,
+  listeners INTEGER DEFAULT 0,
+  status TEXT DEFAULT 'live',
+  when_text TEXT DEFAULT '',
+  scheduled_iso TIMESTAMPTZ,
+  cover INTEGER DEFAULT 215,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.spaces ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Spaces are public" ON public.spaces;
+CREATE POLICY "Spaces are public"
+  ON public.spaces FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "Authenticated users can create spaces" ON public.spaces;
+CREATE POLICY "Authenticated users can create spaces"
+  ON public.spaces FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Hosts can update own spaces" ON public.spaces;
+CREATE POLICY "Hosts can update own spaces"
+  ON public.spaces FOR UPDATE
+  USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Hosts can delete own spaces" ON public.spaces;
+CREATE POLICY "Hosts can delete own spaces"
+  ON public.spaces FOR DELETE
+  USING (auth.role() = 'authenticated');

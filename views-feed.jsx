@@ -274,6 +274,34 @@ const FeedCard = ({ item, navigate }) => {
     if (!draft.trim()) return;
     setComments(c => [...c, { author: 'testuser', when: 'just now', body: draft.trim(), likes: 0 }]);
     setDraft('');
+    // Persist to Supabase if available
+    if (item._supabase && window.supabaseService) {
+      supabaseService.addComment({ postId: item.id, body: draft.trim() }).catch(() => {});
+    }
+  };
+
+  const handleLike = async () => {
+    const next = !liked;
+    setLiked(next);
+    if (item._supabase && window.supabaseService) {
+      try { await supabaseService.toggleReaction({ postId: item.id, type: 'like' }); } catch {}
+    }
+  };
+
+  const handleRepost = async () => {
+    const next = !reposted;
+    setReposted(next);
+    if (item._supabase && window.supabaseService) {
+      try { await supabaseService.toggleReaction({ postId: item.id, type: 'repost' }); } catch {}
+    }
+  };
+
+  const handleBookmark = async () => {
+    const now = toggleSaved({ id: item.id, type: 'post', title: item.title, sub: cat ? cat.name : 'Post', hue: cat ? CAT_META[cat.id].bg : '#FFEA00' });
+    setBookmarked(now);
+    if (item._supabase && window.supabaseService) {
+      try { await supabaseService.toggleReaction({ postId: item.id, type: 'bookmark' }); } catch {}
+    }
   };
 
   const topComment = comments.length > 0
@@ -304,9 +332,15 @@ const FeedCard = ({ item, navigate }) => {
           {author.handle !== 'testuser' && (
             <button
               className={`btn ${isFollowing ? 'ghost' : 'solid'} sm follow-btn`}
-              onClick={(e) => {
+              onClick={async (e) => {
                 e.stopPropagation();
-                toggleFollow(author.handle);
+                const next = !isFollowing;
+                setIsFollowing(next);
+                if (item._supabase && window.supabaseService && item.author_id) {
+                  try { await supabaseService.toggleFollow(item.author_id); } catch { setIsFollowing(!next); }
+                } else {
+                  toggleFollow(author.handle);
+                }
               }}
             >
               {isFollowing ? 'Following' : 'Follow'}
@@ -344,10 +378,10 @@ const FeedCard = ({ item, navigate }) => {
         reposted={reposted}
         bookmarked={bookmarked}
         commentOpen={commentOpen}
-        onLike={() => setLiked(l => !l)}
+        onLike={handleLike}
         onComment={() => setCommentOpen(o => !o)}
-        onRepost={() => setReposted(r => !r)}
-        onBookmark={() => { const now = toggleSaved({ id: item.id, type: 'post', title: item.title, sub: cat ? cat.name : 'Post', hue: cat ? CAT_META[cat.id].bg : '#FFEA00' }); setBookmarked(now); }}
+        onRepost={handleRepost}
+        onBookmark={handleBookmark}
       />
 
       {/* Inline Thread Previews when thread is closed */}
@@ -445,16 +479,23 @@ const FeedView = ({ navigate, onCompose, currentUser }) => {
   const [followingUsers, setFollowingUsers] = React.useState([]);
   const [userReactions, setUserReactions] = React.useState([]);
 
-  React.useEffect(() => {
-    (async () => {
-      try {
-        const posts = await supabaseService.getPosts({ sort });
-        setFeedItems(posts);
-      } catch {
-        setFeedItems(FEED_ITEMS);
-      }
-    })();
+  const loadPosts = React.useCallback(async () => {
+    try {
+      const posts = await supabaseService.getPosts({ sort });
+      setFeedItems(posts.map(normalizeFeedItem));
+    } catch {
+      setFeedItems(FEED_ITEMS);
+    }
   }, [sort]);
+
+  React.useEffect(() => { loadPosts(); }, [loadPosts]);
+
+  // Refresh feed when new post is published
+  React.useEffect(() => {
+    const handler = () => loadPosts();
+    window.addEventListener('compass_feed_refresh', handler);
+    return () => window.removeEventListener('compass_feed_refresh', handler);
+  }, [loadPosts]);
 
   React.useEffect(() => {
     if (!currentUser?.id) return;

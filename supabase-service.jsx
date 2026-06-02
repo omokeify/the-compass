@@ -264,6 +264,145 @@ const supabaseService = {
     if (!res.ok) return [];
     return res.json();
   },
+
+  // ===== Conferences =====
+  async listConferences() {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/conferences?order=created_at.desc`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async getConference(id) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/conferences?id=eq.${id}&select=*`, { headers: authHeaders() });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.[0] || null;
+  },
+
+  async createConference(cls) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/conferences`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        id: cls.id,
+        title: cls.title,
+        description: cls.desc || '',
+        cat: cls.cat || 'training',
+        host: cls.host,
+        cohosts: JSON.stringify(cls.cohosts || []),
+        stage: JSON.stringify(cls.stage || []),
+        status: cls.status || 'scheduled',
+        when_text: cls.when || '',
+        scheduled_iso: cls.scheduledISO || null,
+        duration_min: cls.durationMin || 60,
+        capacity: cls.capacity || 150,
+        registered: cls.registered || 0,
+        registrants: JSON.stringify(cls.registrants || []),
+        attendees: JSON.stringify(cls.attendees || []),
+        recorded: cls.recorded ?? true,
+        publish_events: cls.publishEvents ?? true,
+        notify: cls.notify ?? true,
+        cover: cls.cover || 215,
+        attended: cls.attended || 0,
+        chat: JSON.stringify(cls.chat || []),
+        board_strokes: JSON.stringify(cls.boardStrokes || []),
+      }),
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Failed to create conference'); }
+    return res.json();
+  },
+
+  async updateConference(id, changes) {
+    const body = {};
+    if (changes.status !== undefined) body.status = changes.status;
+    if (changes.registered !== undefined) body.registered = changes.registered;
+    if (changes.registrants !== undefined) body.registrants = JSON.stringify(changes.registrants);
+    if (changes.attendees !== undefined) body.attendees = JSON.stringify(changes.attendees);
+    if (changes.attended !== undefined) body.attended = changes.attended;
+    if (changes.stage !== undefined) body.stage = JSON.stringify(changes.stage);
+    if (changes.chat !== undefined) body.chat = JSON.stringify(changes.chat);
+    if (changes.board_strokes !== undefined) body.board_strokes = JSON.stringify(changes.board_strokes);
+    if (changes.cohosts !== undefined) body.cohosts = JSON.stringify(changes.cohosts);
+    if (changes.title !== undefined) body.title = changes.title;
+    if (changes.description !== undefined) body.description = changes.description;
+    if (changes.cat !== undefined) body.cat = changes.cat;
+    if (changes.when !== undefined) body.when_text = changes.when;
+    if (changes.cover !== undefined) body.cover = changes.cover;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/conferences?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(body),
+    });
+    return res.ok;
+  },
+
+  async deleteConference(id) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/conferences?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    return res.ok;
+  },
+
+  // ===== Spaces =====
+  async listSpaces() {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/spaces?order=created_at.desc`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async getSpace(id) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/spaces?id=eq.${id}&select=*`, { headers: authHeaders() });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.[0] || null;
+  },
+
+  async createSpace(space) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/spaces`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        id: space.id,
+        title: space.title,
+        description: space.desc || '',
+        host: space.host,
+        cohosts: JSON.stringify(space.cohosts || []),
+        speakers: JSON.stringify(space.speakers || []),
+        listeners: space.listeners || 0,
+        status: space.status || 'live',
+        when_text: space.when || '',
+        scheduled_iso: space.scheduledISO || null,
+        cover: space.cover || 215,
+      }),
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Failed to create space'); }
+    return res.json();
+  },
+
+  async updateSpace(id, changes) {
+    const body = {};
+    if (changes.status !== undefined) body.status = changes.status;
+    if (changes.listeners !== undefined) body.listeners = changes.listeners;
+    if (changes.cohosts !== undefined) body.cohosts = JSON.stringify(changes.cohosts);
+    if (changes.speakers !== undefined) body.speakers = JSON.stringify(changes.speakers);
+    if (changes.title !== undefined) body.title = changes.title;
+    if (changes.description !== undefined) body.description = changes.description;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/spaces?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(body),
+    });
+    return res.ok;
+  },
+
+  async deleteSpace(id) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/spaces?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    return res.ok;
+  },
 };
 
 Object.assign(window, { supabaseService });

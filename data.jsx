@@ -472,7 +472,11 @@ const CONFERENCES = [];
 const conferenceService = {
   _key: 'compass_conferences_v1',
 
+  _sb() { return window.supabaseService?.getSession()?.access_token ? window.supabaseService : null; },
+
   async init() {
+    const sb = this._sb();
+    if (sb) return sb.listConferences();
     try {
       const raw = localStorage.getItem(this._key);
       if (raw) {
@@ -488,17 +492,29 @@ const conferenceService = {
     try { localStorage.setItem(this._key, JSON.stringify(CONFERENCES)); } catch {}
   },
 
-  async list() { return [...CONFERENCES]; },
+  async list() {
+    const sb = this._sb();
+    if (sb) return sb.listConferences();
+    return [...CONFERENCES];
+  },
 
-  async get(id) { return CONFERENCES.find(c => c.id === id) || null; },
+  async get(id) {
+    const sb = this._sb();
+    if (sb) return sb.getConference(id);
+    return CONFERENCES.find(c => c.id === id) || null;
+  },
 
   async create(cls) {
+    const sb = this._sb();
+    if (sb) return sb.createConference(cls);
     CONFERENCES.push(cls);
     this._persist();
     return cls;
   },
 
   async update(id, changes) {
+    const sb = this._sb();
+    if (sb) { await sb.updateConference(id, changes); return changes; }
     const idx = CONFERENCES.findIndex(c => c.id === id);
     if (idx === -1) return null;
     Object.assign(CONFERENCES[idx], changes);
@@ -507,6 +523,8 @@ const conferenceService = {
   },
 
   async delete(id) {
+    const sb = this._sb();
+    if (sb) return sb.deleteConference(id);
     const idx = CONFERENCES.findIndex(c => c.id === id);
     if (idx === -1) return false;
     CONFERENCES.splice(idx, 1);
@@ -519,10 +537,23 @@ const conferenceService = {
   },
 
   async end(id) {
+    const sb = this._sb();
+    if (sb) return this.update(id, { status: 'ended' });
     return this.update(id, { status: 'ended', attended: CONFERENCES.find(c => c.id === id)?.registered || 0 });
   },
 
   async register(id, handle) {
+    const sb = this._sb();
+    if (sb) {
+      const cls = await this.get(id);
+      if (!cls) return null;
+      const registrants = cls.registrants || [];
+      if (!registrants.includes(handle)) {
+        registrants.push(handle);
+        await this.update(id, { registrants, registered: (cls.registered || 0) + 1 });
+      }
+      return this.get(id);
+    }
     const cls = CONFERENCES.find(c => c.id === id);
     if (!cls) return null;
     if (!cls.registrants) cls.registrants = [];
@@ -535,6 +566,14 @@ const conferenceService = {
   },
 
   async unregister(id, handle) {
+    const sb = this._sb();
+    if (sb) {
+      const cls = await this.get(id);
+      if (!cls) return null;
+      const registrants = (cls.registrants || []).filter(h => h !== handle);
+      await this.update(id, { registrants, registered: Math.max(0, (cls.registered || 0) - 1) });
+      return this.get(id);
+    }
     const cls = CONFERENCES.find(c => c.id === id);
     if (!cls) return null;
     if (cls.registrants) cls.registrants = cls.registrants.filter(h => h !== handle);
@@ -544,6 +583,14 @@ const conferenceService = {
   },
 
   async addToStage(id, handle) {
+    const sb = this._sb();
+    if (sb) {
+      const cls = await this.get(id);
+      if (!cls) return null;
+      const stage = [...(cls.stage || [])];
+      if (!stage.includes(handle)) stage.push(handle);
+      return this.update(id, { stage });
+    }
     const cls = CONFERENCES.find(c => c.id === id);
     if (!cls) return null;
     if (!cls.stage) cls.stage = [];
@@ -553,6 +600,13 @@ const conferenceService = {
   },
 
   async removeFromStage(id, handle) {
+    const sb = this._sb();
+    if (sb) {
+      const cls = await this.get(id);
+      if (!cls) return null;
+      const stage = (cls.stage || []).filter(h => h !== handle);
+      return this.update(id, { stage });
+    }
     const cls = CONFERENCES.find(c => c.id === id);
     if (!cls) return null;
     if (cls.stage) cls.stage = cls.stage.filter(h => h !== handle);
@@ -561,6 +615,13 @@ const conferenceService = {
   },
 
   async addChat(id, msg) {
+    const sb = this._sb();
+    if (sb) {
+      const cls = await this.get(id);
+      if (!cls) return null;
+      const chat = [...(cls.chat || []), msg];
+      return this.update(id, { chat });
+    }
     const cls = CONFERENCES.find(c => c.id === id);
     if (!cls) return null;
     if (!cls.chat) cls.chat = [];
@@ -570,6 +631,8 @@ const conferenceService = {
   },
 
   async saveBoard(id, strokes) {
+    const sb = this._sb();
+    if (sb) return this.update(id, { boardStrokes: strokes });
     return this.update(id, { boardStrokes: strokes });
   },
 };
@@ -695,7 +758,11 @@ const SPACES = [];
 const spaceService = {
   _key: 'compass_spaces_v1',
 
+  _sb() { return window.supabaseService?.getSession()?.access_token ? window.supabaseService : null; },
+
   async init() {
+    const sb = this._sb();
+    if (sb) return sb.listSpaces();
     try {
       const raw = localStorage.getItem(this._key);
       if (raw) {
@@ -711,17 +778,29 @@ const spaceService = {
     try { localStorage.setItem(this._key, JSON.stringify(SPACES)); } catch {}
   },
 
-  async list() { return [...SPACES]; },
+  async list() {
+    const sb = this._sb();
+    if (sb) return sb.listSpaces();
+    return [...SPACES];
+  },
 
-  async get(id) { return SPACES.find(s => s.id === id) || null; },
+  async get(id) {
+    const sb = this._sb();
+    if (sb) return sb.getSpace(id);
+    return SPACES.find(s => s.id === id) || null;
+  },
 
   async create(space) {
+    const sb = this._sb();
+    if (sb) return sb.createSpace(space);
     SPACES.push(space);
     this._persist();
     return space;
   },
 
   async update(id, changes) {
+    const sb = this._sb();
+    if (sb) { await sb.updateSpace(id, changes); return changes; }
     const idx = SPACES.findIndex(s => s.id === id);
     if (idx === -1) return null;
     Object.assign(SPACES[idx], changes);
@@ -730,6 +809,8 @@ const spaceService = {
   },
 
   async delete(id) {
+    const sb = this._sb();
+    if (sb) return sb.deleteSpace(id);
     const idx = SPACES.findIndex(s => s.id === id);
     if (idx === -1) return false;
     SPACES.splice(idx, 1);
@@ -738,6 +819,14 @@ const spaceService = {
   },
 
   async addCohost(id, handle) {
+    const sb = this._sb();
+    if (sb) {
+      const space = await this.get(id);
+      if (!space) return null;
+      const cohosts = [...(space.cohosts || [])];
+      if (!cohosts.includes(handle)) cohosts.push(handle);
+      return this.update(id, { cohosts });
+    }
     const space = SPACES.find(s => s.id === id);
     if (!space) return null;
     if (!space.cohosts) space.cohosts = [];
@@ -747,6 +836,13 @@ const spaceService = {
   },
 
   async removeCohost(id, handle) {
+    const sb = this._sb();
+    if (sb) {
+      const space = await this.get(id);
+      if (!space) return null;
+      const cohosts = (space.cohosts || []).filter(h => h !== handle);
+      return this.update(id, { cohosts });
+    }
     const space = SPACES.find(s => s.id === id);
     if (!space) return null;
     if (space.cohosts) space.cohosts = space.cohosts.filter(h => h !== handle);
@@ -755,17 +851,15 @@ const spaceService = {
   },
 
   async bumpListeners(id, by = 1) {
+    const sb = this._sb();
+    if (sb) {
+      const space = await this.get(id);
+      if (!space) return null;
+      return this.update(id, { listeners: (space.listeners || 0) + by });
+    }
     const space = SPACES.find(s => s.id === id);
     if (!space) return null;
     space.listeners = (space.listeners || 0) + by;
-    this._persist();
-    return space;
-  },
-
-  async toggleReminder(id, on) {
-    const space = SPACES.find(s => s.id === id);
-    if (!space) return null;
-    space.reminders = Math.max(0, (space.reminders || 0) + (on ? 1 : -1));
     this._persist();
     return space;
   },

@@ -29,6 +29,9 @@ desktop.ini
 uploads/pasted-*
 uploads/*.pptx
 
+# Notes
+supa.md
+
 # Temporary files
 *.tmp
 *.temp

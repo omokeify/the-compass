@@ -1238,6 +1238,7 @@ const Composer = ({ onClose, defaultCat, currentUser }) => {
           cat,
           media: null,
         });
+        window.dispatchEvent(new Event('compass_feed_refresh'));
       } catch (e) {
         console.error('Failed to publish:', e);
       }
