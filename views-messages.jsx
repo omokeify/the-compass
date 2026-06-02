@@ -58,6 +58,16 @@ const MessagesPage = ({ navigate, currentUser }) => {
     } catch {}
   };
 
+  const newConversation = async () => {
+    const others = USERS.filter(u => u.handle !== me);
+    const target = others[Math.floor(Math.random() * others.length)];
+    if (!target) return;
+    try {
+      await messageService.createConversation({ participantHandles: [me, target.handle] });
+      await loadConversations();
+    } catch {}
+  };
+
   const filtered = convos.filter(c => {
     if (!search) return true;
     const other = otherHandle(c);
@@ -72,7 +82,7 @@ const MessagesPage = ({ navigate, currentUser }) => {
         <aside className="msg-list-col">
           <header className="msg-list-head">
             <h1 className="msg-list-title">Messages</h1>
-            <button className="btn primary sm"><Icon name="plus" size={12} /> New</button>
+            <button className="btn primary sm" onClick={newConversation}><Icon name="plus" size={12} /> New</button>
           </header>
           <div className="msg-search">
             <Icon name="search" size={13} />

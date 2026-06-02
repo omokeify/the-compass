@@ -297,6 +297,7 @@ CREATE POLICY "Hosts can delete own spaces"
 -- 11. Conversations / DMs
 CREATE TABLE IF NOT EXISTS public.conversations (
   id TEXT PRIMARY KEY,
+  participant_ids UUID[] DEFAULT '{}',
   participants JSONB NOT NULL DEFAULT '[]'::jsonb,
   last_message TEXT DEFAULT '',
   last_when TIMESTAMPTZ DEFAULT now(),
@@ -305,15 +306,10 @@ CREATE TABLE IF NOT EXISTS public.conversations (
 
 ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
 
-CREATE OR REPLACE FUNCTION public.conversation_participant_ids()
-RETURNS SETOF UUID AS $$
-  SELECT jsonb_array_elements_text(participants)::UUID;
-$$ LANGUAGE sql STABLE;
-
 DROP POLICY IF EXISTS "Participants can view conversations" ON public.conversations;
 CREATE POLICY "Participants can view conversations"
   ON public.conversations FOR SELECT
-  USING (auth.uid()::TEXT = ANY (SELECT jsonb_array_elements_text(participants)));
+  USING (auth.uid() = ANY (participant_ids));
 
 DROP POLICY IF EXISTS "Authenticated users can create conversations" ON public.conversations;
 CREATE POLICY "Authenticated users can create conversations"
@@ -322,13 +318,13 @@ CREATE POLICY "Authenticated users can create conversations"
 
 DROP POLICY IF EXISTS "Participants can update conversations" ON public.conversations;
 CREATE POLICY "Participants can update conversations"
-  ON public.conversations FOR UPDATE
-  USING (auth.uid()::TEXT = ANY (SELECT jsonb_array_elements_text(participants)));
+  ON public.conferences FOR UPDATE
+  USING (auth.uid() = ANY (participant_ids));
 
 DROP POLICY IF EXISTS "Participants can delete conversations" ON public.conversations;
 CREATE POLICY "Participants can delete conversations"
-  ON public.conversations FOR DELETE
-  USING (auth.uid()::TEXT = ANY (SELECT jsonb_array_elements_text(participants)));
+  ON public.conferences FOR DELETE
+  USING (auth.uid() = ANY (participant_ids));
 
 -- 12. Messages
 CREATE TABLE IF NOT EXISTS public.messages (
