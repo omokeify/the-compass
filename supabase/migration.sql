@@ -446,7 +446,7 @@ CREATE POLICY "Users can update own quests"
 CREATE TABLE IF NOT EXISTS public.attendance (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  conference_id UUID REFERENCES public.conferences(id) ON DELETE CASCADE,
+  conference_id TEXT REFERENCES public.conferences(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, conference_id)
 );
@@ -499,14 +499,17 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own notifications" ON public.notifications;
 CREATE POLICY "Users can view own notifications"
   ON public.notifications FOR SELECT
   USING (auth.role() = 'authenticated' AND user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can update own notifications" ON public.notifications;
 CREATE POLICY "Users can update own notifications"
   ON public.notifications FOR UPDATE
   USING (auth.role() = 'authenticated' AND user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can insert notifications" ON public.notifications;
 CREATE POLICY "Users can insert notifications"
   ON public.notifications FOR INSERT
   WITH CHECK (auth.role() = 'authenticated');
@@ -532,10 +535,12 @@ CREATE INDEX IF NOT EXISTS idx_notif_unread ON public.notifications(user_id) WHE
 
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own notifications" ON public.notifications;
 CREATE POLICY "Users can view own notifications"
   ON public.notifications FOR SELECT
   USING (auth.role() = 'authenticated' AND user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can update own notifications" ON public.notifications;
 CREATE POLICY "Users can update own notifications"
   ON public.notifications FOR UPDATE
   USING (user_id = auth.uid());

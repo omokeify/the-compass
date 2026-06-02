@@ -163,7 +163,7 @@ const supabaseService = {
   },
 
   async getProfileByHandle(handle) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?handle=eq.${encodeURIComponent(handle)}&select=handle,email`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?handle=eq.${encodeURIComponent(handle)}&select=*`, {
       headers: { 'apikey': SUPABASE_ANON_KEY },
     });
     const data = await res.json();

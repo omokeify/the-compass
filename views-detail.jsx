@@ -236,10 +236,11 @@ const toggleFollow = (authorHandle) => {
 
 const ProfilePage = ({ handle, navigate, tab, currentUser }) => {
   const actualHandle = handle || currentUser?.handle;
-  const u = userByHandle(actualHandle);
+  const [u, setU] = React.useState(userByHandle(actualHandle));
   const isMe = actualHandle === currentUser?.handle;
   const [active, setActive] = React.useState(tab || 'overview');
   React.useEffect(() => { if (tab) setActive(tab); }, [tab]);
+  React.useEffect(() => { fetchUserByHandle(actualHandle).then(setU); }, [actualHandle]);
 
   const selectTab = (nextTab) => {
     setActive(nextTab);

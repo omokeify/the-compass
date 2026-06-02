@@ -92,79 +92,36 @@ const USERS = [
    { handle: 'zara',    name: 'Zara Haile',      tier: 'Navigator',    kp: 3100, joined: '2024-05-20', bio: 'Motion designer helping Web3 projects tell better stories.', loc: 'Addis Ababa, ET', avatar: 'Z', hue: 340 },
 ];
 
-const LEVEL_NAMES = ['Explorer', 'Scout', 'Pathfinder', 'Navigator', 'Wayfinder', 'Trailblazer', 'Vanguard', 'Compass Elite', 'Compass Legend'];
-const LEVEL_THRESHOLDS = [0, 200, 600, 1500, 3500, 7000, 12000, 20000, 35000];
+const PROFILE_CACHE = {};
 
-const getLevelFromKp = (kp = 0) => {
-  let level = 1;
-  for (let i = 0; i < LEVEL_THRESHOLDS.length; i += 1) {
-    if (kp >= LEVEL_THRESHOLDS[i]) level = i + 1;
-  }
-  return Math.min(level, LEVEL_NAMES.length);
+const userByHandle = (h) => {
+  if (!h) return USERS[0];
+  return PROFILE_CACHE[h] || USERS.find(u => u.handle === h) || { handle: h, name: h, avatar: h[0].toUpperCase(), hue: 215, tier: 'Explorer', kp: 0, bio: '', loc: '' };
 };
 
-const getLevelName = (level) => {
-  const idx = Math.max(1, Math.min(level, LEVEL_NAMES.length)) - 1;
-  return LEVEL_NAMES[idx];
+const fetchUserByHandle = async (h) => {
+  const sb = window.supabaseService?.getSession()?.access_token ? window.supabaseService : null;
+  if (!sb) return userByHandle(h);
+  try {
+    const profile = await sb.getProfileByHandle(h);
+    if (!profile) return userByHandle(h);
+    const user = {
+      id: profile.id,
+      handle: profile.handle,
+      name: profile.fullname || profile.handle,
+      email: profile.email,
+      avatar: profile.avatar || (profile.handle ? profile.handle[0].toUpperCase() : 'U'),
+      hue: profile.hue || 215,
+      bio: profile.bio || '',
+      loc: profile.loc || '',
+      tier: profile.tier || 'Explorer',
+      kp: profile.kp || 0,
+      role: profile.role || null,
+    };
+    PROFILE_CACHE[h] = user;
+    return user;
+  } catch { return userByHandle(h); }
 };
-
-const getUserLevel = (user) => user ? getLevelFromKp(user.kp) : 1;
-
-const parseLockLevel = (value) => {
-  if (value == null) return 1;
-  if (typeof value === 'number') return Math.max(1, Math.min(value, LEVEL_NAMES.length));
-  const str = String(value).trim();
-  const found = LEVEL_NAMES.findIndex(name => name.toLowerCase() === str.toLowerCase());
-  if (found !== -1) return found + 1;
-  const parsed = Number(str.replace(/[^0-9]/g, ''));
-  return Number.isInteger(parsed) && parsed >= 1 ? Math.min(parsed, LEVEL_NAMES.length) : 1;
-};
-
-const CATEGORY_ACCESS = {
-  news:        { view: 1, post: 9, reply: 1 },
-  earn:        { view: 3, post: 9, reply: 1 },
-  skills:      { view: 4, post: 9, reply: 2 },
-  activities:  { view: 99, post: 99, reply: 99 },
-  events:      { view: 1, post: 9, reply: 1 },
-  training:    { view: 3, post: 9, reply: 1 },
-  alpha:       { view: 5, post: 6, reply: 6 },
-  partnership: { view: 1, post: 9, reply: 9 },
-};
-
-const getCategoryAccess = (catId) => CATEGORY_ACCESS[catId] || { view: 1, post: 9, reply: 9 };
-
-const canViewCategory = (user, catId) => {
-  const access = getCategoryAccess(catId);
-  return getUserLevel(user) >= access.view;
-};
-
-const canPostCategory = (user, catId) => {
-  const access = getCategoryAccess(catId);
-  return getUserLevel(user) >= access.post;
-};
-
-const canReplyCategory = (user, catId) => {
-  const access = getCategoryAccess(catId);
-  return getUserLevel(user) >= access.reply;
-};
-
-const canViewTopic = (user, topic) => {
-  const req = topic.locked ? parseLockLevel(topic.locked) : getCategoryAccess(topic.cat).view;
-  return getUserLevel(user) >= req;
-};
-
-const canReplyTopic = (user, topic) => {
-  const topicLevel = topic.locked ? parseLockLevel(topic.locked) : 1;
-  const replyReq = Math.max(topicLevel, getCategoryAccess(topic.cat).reply);
-  return getUserLevel(user) >= replyReq;
-};
-
-const requiredLevelLabel = (level) => {
-  const lvl = parseLockLevel(level);
-  return `${getLevelName(lvl)} · Level ${lvl}`;
-};
-
-const userByHandle = (h) => USERS.find(u => u.handle === h) || USERS[0];
 
 const TAGS = [];
 
@@ -1104,6 +1061,7 @@ Object.assign(window, {
   LEVEL_NAMES, LEVEL_THRESHOLDS, getLevelFromKp, getLevelName, getUserLevel,
   parseLockLevel, CATEGORY_ACCESS, getCategoryAccess, canViewCategory, canPostCategory, canReplyCategory,
   canViewTopic, canReplyTopic, requiredLevelLabel,
+  PROFILE_CACHE, fetchUserByHandle,
 });
 
 window.__notifUnreadCount = 0;

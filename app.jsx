@@ -26,6 +26,9 @@ function App() {
   const [route, setRoute] = React.useState(() => routeFromPath());
   const [loggedIn, setLoggedIn] = React.useState(false);
   const [currentUser, setCurrentUser] = React.useState(null);
+
+  const cacheUser = (u) => { if (u?.handle) window.PROFILE_CACHE ? window.PROFILE_CACHE[u.handle] = u : null; };
+  const setAndCacheUser = (u) => { cacheUser(u); setCurrentUser(u); };
   const [authLoading, setAuthLoading] = React.useState(true);
   const [composer, setComposer] = React.useState(null);
   const [signup, setSignup] = React.useState(false);
@@ -52,7 +55,7 @@ function App() {
           if (user) {
             const profile = await supabaseService.getProfile(user.id);
             const mapped = mapSbProfile(user, profile);
-            setCurrentUser(mapped);
+            setAndCacheUser(mapped);
             setLoggedIn(true);
           }
         }
@@ -81,7 +84,7 @@ function App() {
         }
         const { user } = await supabaseService.signIn({ email: loginEmail, password });
         const profile = await supabaseService.getProfile(user.id);
-        setCurrentUser(mapSbProfile(user, profile));
+        setAndCacheUser(mapSbProfile(user, profile));
       } catch (e) {
         showToast(e.message || 'Sign in failed');
         return;
@@ -101,7 +104,7 @@ function App() {
         return;
       }
       const profile = await supabaseService.getProfile(result.user.id);
-      setCurrentUser(mapSbProfile(result.user, profile));
+      setAndCacheUser(mapSbProfile(result.user, profile));
       setLoggedIn(true);
       setOnboard(true);
       navigate({ view: 'feed' });
