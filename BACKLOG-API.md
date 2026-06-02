@@ -45,106 +45,95 @@ Below is every backend endpoint needed to make the app functional.
 | `PUT /api/notifications/read` | Mark all as read |
 
 ## Messages
-| Endpoint | Purpose |
-|---|---|
-| `GET    /api/conversations` | List conversations |
-| `GET    /api/conversations/:id` | Get messages in conversation |
-| `POST   /api/conversations/:id/messages` | Send message |
+| Endpoint | Purpose | Status |
+|---|---|---|
+| `GET /api/conversations` | List conversations | Supabase REST wired |
+| `GET /api/conversations/:id` | Get messages in conversation | Supabase REST wired |
+| `POST /api/conversations/:id/messages` | Send message | Supabase REST wired |
+| `WS /realtime/conversations/:id` | Real-time message push | Client-side `subscribeRealtime` added; not yet wired in UI |
 
 ## Spaces (Audio Rooms)
-| Endpoint | Purpose |
-|---|---|
-| `GET    /api/spaces` | List spaces |
-| `GET    /api/spaces/:id` | Get space |
-| `POST   /api/spaces` | Create space |
-| `PUT    /api/spaces/:id` | Update space (title, cohosts, status) |
-| `DELETE /api/spaces/:id` | Delete / end space |
-| `POST   /api/spaces/:id/listeners` | Join (bump listener count) |
-| `POST   /api/spaces/:id/reminders` | Toggle reminder |
-
-## Talent Marketplace
-| Endpoint | Purpose |
-|---|---|
-| `GET    /api/talent` | List gigs |
-| `GET    /api/talent/:id` | Get gig detail |
-| `POST   /api/talent` | Create gig |
-| `GET    /api/talent/reviews` | Get reviews |
-| `GET    /api/talent/skills` | List skill categories |
+| Endpoint | Purpose | Status |
+|---|---|---|
+| `GET /api/spaces` | List spaces | Supabase REST wired |
+| `GET /api/spaces/:id` | Get space | Supabase REST wired |
+| `POST /api/spaces` | Create space | Supabase REST wired |
+| `PUT /api/spaces/:id` | Update space | Supabase REST wired |
+| `DELETE /api/spaces/:id` | Delete / end space | Supabase REST wired |
+| `POST /api/spaces/:id/listeners` | Join (bump listener count) | Supabase REST wired |
+| `POST /api/spaces/:id/reminders` | Toggle reminder | Supabase REST wired |
 
 ## Conferences / Classes
-| Endpoint | Purpose |
-|---|---|
-| `GET    /api/conferences` | List classes |
-| `POST   /api/conferences` | Schedule a class |
-| `POST   /api/conferences/:id/register` | Register for class |
-| `POST   /api/conferences/:id/unregister` | Unregister from class |
-| `PUT    /api/conferences/:id/start` | Start a class (set status to live) |
-| `PUT    /api/conferences/:id/end` | End a class (set status to ended) |
-| `POST   /api/conferences/:id/stage` | Add user to stage |
-| `DELETE /api/conferences/:id/stage/:handle` | Remove user from stage |
-| `POST   /api/conferences/:id/chat` | Add chat message |
-| `PUT    /api/conferences/:id/board` | Save whiteboard strokes |
+| Endpoint | Purpose | Status |
+|---|---|---|
+| `GET /api/conferences` | List classes | Supabase REST wired |
+| `POST /api/conferences` | Schedule a class | Supabase REST wired |
+| `GET /api/conferences/:id` | Get class detail | Supabase REST wired |
+| `POST /api/conferences/:id/register` | Register for class | Supabase REST wired |
+| `POST /api/conferences/:id/unregister` | Unregister from class | Supabase REST wired |
+| `PUT /api/conferences/:id/start` | Start a class (set status to live) | Supabase REST wired |
+| `PUT /api/conferences/:id/end` | End a class (set status to ended) | Supabase REST wired |
+| `POST /api/conferences/:id/stage` | Add user to stage | Supabase REST wired |
+| `DELETE /api/conferences/:id/stage/:handle` | Remove user from stage | Supabase REST wired |
+| `POST /api/conferences/:id/chat` | Add chat message | Supabase REST wired |
+| `PUT /api/conferences/:id/board` | Save whiteboard strokes | Supabase REST wired |
+| `GET /api/conferences/:id/replay` | Get replay URL | Supabase REST wired |
+| `POST /api/conferences/:id/purchase` | Purchase replay | Supabase REST wired |
 
-## Attendance & KP Rewards
-| Endpoint | Purpose |
-|---|---|
-| `POST /api/attendance/:classId` | Mark user as attended (awards KP) |
-| `GET  /api/users/:handle/attendance` | Get user's attended class IDs |
-| `GET  /api/users/:handle/kp-log` | Get KP breakdown log |
-
-## Replay Access
-| Endpoint | Purpose |
-|---|---|
-| `GET /api/conferences/:id/replay` | Get replay URL (checks attendance or purchase)
-| `POST /api/conferences/:id/purchase` | Purchase replay access for non-attendees |
-
-## Members Directory
-| Endpoint | Purpose |
-|---|---|
-| `GET /api/members` | List members (region, sector filters) |
-| `GET /api/members/:handle` | Get member card detail |
-
-## Wallet
-| Endpoint | Purpose |
-|---|---|
-| `GET /api/wallet` | Get wallet balance & KP |
-| `GET /api/wallet/transactions` | Get transaction history |
+## Notifications
+| Endpoint | Purpose | Status |
+|---|---|---|
+| `GET /api/notifications` | List notifications | LocalStorage only |
+| `PUT /api/notifications/read` | Mark all as read | LocalStorage only |
 
 ## Saved / Bookmarks
-| Endpoint | Purpose |
-|---|---|
-| `GET    /api/saved` | Get saved items |
-| `POST   /api/saved` | Save an item |
-| `DELETE /api/saved/:type/:id` | Remove saved item |
+| Endpoint | Purpose | Status |
+|---|---|---|
+| `GET /api/saved` | Get saved items | Not started |
+| `POST /api/saved` | Save an item | Not started |
+| `DELETE /api/saved/:type/:id` | Remove saved item | Not started |
+
+## Attendance & KP Rewards
+| Endpoint | Purpose | Status |
+|---|---|---|
+| `POST /api/attendance/:classId` | Mark user as attended (awards KP) | LocalStorage only |
+| `GET /api/users/:handle/attendance` | Get user's attended class IDs | LocalStorage only |
+| `GET /api/users/:handle/kp-log` | Get KP breakdown log | LocalStorage only |
+
+## Wallet
+| Endpoint | Purpose | Status |
+|---|---|---|
+| `GET /api/wallet` | Get wallet balance & KP | LocalStorage only |
+| `GET /api/wallet/transactions` | Get transaction history | Not started |
 
 ## Editorial Content
-| Endpoint | Purpose |
-|---|---|
-| `GET    /api/content` | List editorial content |
-| `POST   /api/content` | Create content |
-| `PUT    /api/content/:id` | Update content |
+| Endpoint | Purpose | Status |
+|---|---|---|
+| `GET /api/content` | List editorial content | Not listed in schema yet |
+| `POST /api/content` | Create content | Not started |
+| `PUT /api/content/:id` | Update content | Not started |
 
 ## Quests
-| Endpoint | Purpose |
-|---|---|
-| `GET /api/quests` | List daily quests |
-| `PUT /api/quests/:id/complete` | Mark quest complete |
+| Endpoint | Purpose | Status |
+|---|---|---|
+| `GET /api/quests` | List daily quests | LocalStorage only |
+| `PUT /api/quests/:id/complete` | Mark quest complete | LocalStorage only |
 
 ## Leaderboard
-| Endpoint | Purpose |
-|---|---|
-| `GET /api/leaderboard` | Get leaderboard (time filter: week/month/all) |
+| Endpoint | Purpose | Status |
+|---|---|---|
+| `GET /api/leaderboard` | Get leaderboard (time filter: week/month/all) | Not started |
 
 ## Search
-| Endpoint | Purpose |
-|---|---|
-| `GET /api/search?q=` | Global search (members, topics, talent, classes, tags) |
+| Endpoint | Purpose | Status |
+|---|---|---|
+| `GET /api/search?q=` | Global search (members, topics, talent, classes, tags) | Not started |
 
 ## Tags
-| Endpoint | Purpose |
-|---|---|
-| `GET /api/tags` | List tags |
-| `GET /api/tags/:id/topics` | Topics for a tag |
+| Endpoint | Purpose | Status |
+|---|---|---|
+| `GET /api/tags` | List tags | LocalStorage |
+| `GET /api/tags/:id/topics` | Topics for a tag | LocalStorage |
 
 ---
 
