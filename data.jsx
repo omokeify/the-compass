@@ -183,6 +183,7 @@ const fetchUserByHandle = async (h) => {
       name: profile.fullname || profile.handle,
       email: profile.email,
       avatar: profile.avatar || (profile.handle ? profile.handle[0].toUpperCase() : 'U'),
+      banner: profile.banner || '',
       hue: profile.hue || 215,
       bio: profile.bio || '',
       loc: profile.loc || '',
@@ -200,6 +201,7 @@ const TAGS = [];
 const TOPICS = [];
 
 const TRENDING_TAGS = [];
+const SUGGESTED_USERS = [];
 
 const EVENTS_UPCOMING = [];
 
@@ -963,7 +965,7 @@ const spaceService = {
 
   async init() {
     const sb = this._sb();
-    if (sb) return sb.listSpaces();
+    if (sb) return await sb.listSpaces();
     try {
       const raw = localStorage.getItem(this._key);
       if (raw) {
@@ -1001,7 +1003,7 @@ const spaceService = {
 
   async list() {
     const sb = this._sb();
-    if (sb) return (sb.listSpaces() || []).map(s => this._normSpace(s));
+    if (sb) return (await sb.listSpaces() || []).map(s => this._normSpace(s));
     return [...SPACES];
   },
 
@@ -1124,7 +1126,7 @@ const PRO_PLANS = [];
 const PRO_PERKS = [];
 
 Object.assign(window, {
-  CATEGORIES, USERS, userByHandle, TAGS, TOPICS, TRENDING_TAGS, EVENTS_UPCOMING,
+  CATEGORIES, USERS, userByHandle, TAGS, TOPICS, TRENDING_TAGS, SUGGESTED_USERS, EVENTS_UPCOMING,
   ONLINE_MEMBERS, CONTENT_ITEMS, NOTIFICATIONS, CONVERSATIONS, TALENT, TALENT_SKILLS,
   REGIONS, SECTORS, MEMBERS, CONFERENCES, CAN_HOST_TIERS, canCreateEvent, genConfId,
   QUESTS, BOUNTIES, WALLET, PRO_PLANS, PRO_PERKS,
@@ -1153,21 +1155,29 @@ window.__notifRefresh = async () => {
 
 const COMPASS_LIVE_TICK_MS = 3000;
 
+async function refreshSocial() {
+  const session = window.supabaseService?.getSession()?.access_token;
+  if (!session) return;
+  try {
+    const handle = window.currentUser?.handle || '';
+    const [spaces, conferences, notifs, suggested, trending] = await Promise.all([
+      spaceService.list(),
+      conferenceService.list(),
+      window.__notifRefresh(),
+      window.supabaseService.getSuggestedUsers(handle),
+      window.supabaseService.getTrendingTags(10),
+    ]);
+    if (Array.isArray(spaces)) { SPACES.length = 0; SPACES.push(...spaces); window.dispatchEvent(new Event('compass_spaces_refresh')); }
+    if (Array.isArray(conferences)) { CONFERENCES.length = 0; CONFERENCES.push(...conferences); window.dispatchEvent(new Event('compass_conferences_refresh')); }
+    const convos = await messageService.listConversations();
+    if (Array.isArray(convos)) { CONVERSATIONS.length = 0; CONVERSATIONS.push(...convos); window.dispatchEvent(new Event('compass_conversations_refresh')); }
+    if (Array.isArray(suggested)) { SUGGESTED_USERS.length = 0; SUGGESTED_USERS.push(...suggested); }
+    if (Array.isArray(trending)) { TRENDING_TAGS.length = 0; TRENDING_TAGS.push(...trending); }
+  } catch {}
+}
+
 if (!window.__compass_poller_running) {
   window.__compass_poller_running = true;
-  setInterval(async () => {
-    const session = window.supabaseService?.getSession()?.access_token;
-    if (!session) return;
-    try {
-      const [spaces, conferences, notifs] = await Promise.all([
-        spaceService.list(),
-        conferenceService.list(),
-        window.__notifRefresh(),
-      ]);
-      if (Array.isArray(spaces)) { SPACES.length = 0; SPACES.push(...spaces); window.dispatchEvent(new Event('compass_spaces_refresh')); }
-      if (Array.isArray(conferences)) { CONFERENCES.length = 0; CONFERENCES.push(...conferences); window.dispatchEvent(new Event('compass_conferences_refresh')); }
-      const convos = await messageService.listConversations();
-      if (Array.isArray(convos)) { CONVERSATIONS.length = 0; CONVERSATIONS.push(...convos); window.dispatchEvent(new Event('compass_conversations_refresh')); }
-    } catch {}
-  }, COMPASS_LIVE_TICK_MS);
+  refreshSocial();
+  setInterval(refreshSocial, COMPASS_LIVE_TICK_MS);
 }

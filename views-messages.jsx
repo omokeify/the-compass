@@ -58,15 +58,20 @@ const MessagesPage = ({ navigate, currentUser }) => {
     } catch {}
   };
 
-  const newConversation = async () => {
-    const others = USERS.filter(u => u.handle !== me);
-    const target = others[Math.floor(Math.random() * others.length)];
-    if (!target) return;
+  const [showUserPicker, setShowUserPicker] = React.useState(false);
+  const [userSearch, setUserSearch] = React.useState('');
+
+  const newConversation = async (targetHandle) => {
+    if (!targetHandle) return;
     try {
-      await messageService.createConversation({ participantHandles: [me, target.handle] });
+      await messageService.createConversation({ participantHandles: [me, targetHandle] });
       await loadConversations();
+      setShowUserPicker(false);
+      setUserSearch('');
     } catch {}
   };
+
+  const filteredUsers = (USERS || []).filter(u => u.handle !== me && (!userSearch || u.handle.toLowerCase().includes(userSearch.toLowerCase()) || u.name.toLowerCase().includes(userSearch.toLowerCase())));
 
   const filtered = convos.filter(c => {
     if (!search) return true;
@@ -78,12 +83,33 @@ const MessagesPage = ({ navigate, currentUser }) => {
 
   return (
     <div className="view messages-view">
-      <div className="msg-layout">
+      <div className={`msg-layout ${activeId ? 'has-active' : ''}`}>
         <aside className="msg-list-col">
           <header className="msg-list-head">
             <h1 className="msg-list-title">Messages</h1>
-            <button className="btn primary sm" onClick={newConversation}><Icon name="plus" size={12} /> New</button>
+            <button className="btn primary sm" onClick={() => setShowUserPicker(true)}><Icon name="plus" size={12} /> New</button>
           </header>
+          {showUserPicker && (
+            <div className="msg-user-picker" style={{ padding: '8px 12px', borderBottom: '1px solid #e0e0e0' }}>
+              <div className="msg-search" style={{ margin: 0 }}>
+                <Icon name="search" size={13} />
+                <input placeholder="Find a user…" value={userSearch} onChange={e => setUserSearch(e.target.value)} autoFocus />
+              </div>
+              <ul className="nd-list" style={{ maxHeight: 240, overflowY: 'auto', marginTop: 4 }}>
+                {filteredUsers.length === 0 && <li className="nd-empty">No users found.</li>}
+                {filteredUsers.map(u => (
+                  <li key={u.handle} className="nd-row" style={{ cursor: 'pointer' }} onClick={() => newConversation(u.handle)}>
+                    <Avatar user={u} size={32} />
+                    <div className="nd-body">
+                      <div className="nd-text"><strong>{u.name}</strong></div>
+                      <div className="nd-when">@{u.handle}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="msg-search">
             <Icon name="search" size={13} />
             <input

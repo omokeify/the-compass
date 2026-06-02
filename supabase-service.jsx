@@ -68,6 +68,13 @@ async function ensureValidToken() {
   return _refreshInProgress;
 }
 
+function extractHashtags(text) {
+  if (!text) return [];
+  const matches = text.match(/#(\w+)/g);
+  if (!matches) return [];
+  return [...new Set(matches.map(t => t.slice(1).toLowerCase()))];
+}
+
 const supabaseService = {
   // ===== Auth =====
   async signUp({ email, password, fullname, handle }) {
@@ -190,10 +197,37 @@ const supabaseService = {
     } catch { return null; }
   },
 
+  async getTopMembers(limit = 5) {
+    const url = `${SUPABASE_URL}/rest/v1/profiles?select=id,handle,fullname,avatar,hue,kp,tier&order=kp.desc&limit=${limit}`;
+    const res = await fetch(url, { headers: { 'apikey': SUPABASE_ANON_KEY } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.map(p => ({ ...p, name: p.fullname }));
+  },
+
+  async getSuggestedUsers(excludeHandle) {
+    const url = `${SUPABASE_URL}/rest/v1/profiles?select=id,handle,fullname,avatar,hue,kp,tier&handle=neq.${encodeURIComponent(excludeHandle || '')}&order=kp.desc&limit=5`;
+    const res = await fetch(url, { headers: { 'apikey': SUPABASE_ANON_KEY } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.map(p => ({ ...p, name: p.fullname }));
+  },
+
+  async getTrendingTags(limit = 10) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_trending_tags`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ limit_count: limit }),
+    });
+    if (!res.ok) return [];
+    return res.json();
+  },
+
   // ===== Posts =====
   async createPost({ title, body, type, cat, media }) {
     const session = getSession();
     if (!session?.user?.id) throw new Error('Not authenticated');
+    const tags = extractHashtags(body || '');
     const res = await fetch(`${SUPABASE_URL}/rest/v1/posts`, {
       method: 'POST',
       headers: authHeaders(),
@@ -201,6 +235,7 @@ const supabaseService = {
         author_id: session.user.id,
         title,
         body: body || '',
+        tags,
         type: type || 'Signal',
         cat: cat || 'news',
         media: media || null,
@@ -228,6 +263,94 @@ const supabaseService = {
     const res = await fetch(url, { headers: authHeaders() });
     if (!res.ok) return [];
     return res.json();
+  },
+
+  async updatePost(postId, changes) {
+    const session = getSession();
+    // Save current version before updating
+    if (changes.title !== undefined || changes.body !== undefined) {
+      const current = await this.getPost(postId);
+      if (current) {
+        const verRes = await fetch(`${SUPABASE_URL}/rest/v1/post_versions?post_id=eq.${postId}&select=version&order=version.desc&limit=1`, { headers: authHeaders() });
+        const verData = verRes.ok ? await verRes.json() : [];
+        const nextVer = (verData?.[0]?.version || 0) + 1;
+        await fetch(`${SUPABASE_URL}/rest/v1/post_versions`, {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({
+            post_id: postId,
+            title: current.title || '',
+            body: current.body || '',
+            edited_by: session?.user?.id,
+            version: nextVer,
+          }),
+        });
+      }
+    }
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/posts?id=eq.${postId}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(changes),
+    });
+    return res.ok;
+  },
+
+  async getPost(postId) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/posts?id=eq.${postId}&select=*`, { headers: authHeaders() });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.[0] || null;
+  },
+
+  async getPostVersions(postId) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/post_versions?post_id=eq.${postId}&order=version.desc`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async setSolvedComment(postId, commentId) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/posts?id=eq.${postId}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ solved_comment_id: commentId || null }),
+    });
+    return res.ok;
+  },
+
+  async createFlag(targetType, targetId, reason) {
+    const session = getSession();
+    if (!session?.user?.id) throw new Error('Not authenticated');
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/flags`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        user_id: session.user.id,
+        target_type: targetType,
+        target_id: String(targetId),
+        reason,
+      }),
+    });
+    return res.ok;
+  },
+
+  async getFlags(status = 'open') {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/flags?status=eq.${status}&order=created_at.desc`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async resolveFlag(flagId, resolved = true) {
+    const session = getSession();
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/flags?id=eq.${flagId}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        status: resolved ? 'resolved' : 'dismissed',
+        resolved_at: new Date().toISOString(),
+        resolved_by: session?.user?.id,
+      }),
+    });
+    return res.ok;
   },
 
   async deletePost(postId) {
@@ -431,7 +554,7 @@ const supabaseService = {
   async listSpaces() {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/spaces?order=created_at.desc`, { headers: authHeaders() });
     if (!res.ok) return [];
-    return res.json();
+    try { return await res.json(); } catch { return []; }
   },
 
   async getSpace(id) {
@@ -465,8 +588,12 @@ const supabaseService = {
         cover: space.cover || 215,
       }),
     });
-    if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Failed to create space'); }
-    return res.json();
+    if (!res.ok) {
+      let msg = 'Failed to create space';
+      try { const e = await res.json(); msg = e.message || msg; } catch {}
+      throw new Error(msg);
+    }
+    try { return await res.json(); } catch { return { id: space.id }; }
   },
 
   async updateSpace(id, changes) {
@@ -835,23 +962,142 @@ const supabaseService = {
     });
   },
 
-  async createNotification(kind, text, target, targetId) {
+  async createNotification(userId, kind, text, actorHandle, target, targetId) {
     const session = getSession();
     if (!session?.user?.id) throw new Error('Not authenticated');
+    if (!userId || userId === session.user.id) return false;
     const res = await fetch(`${SUPABASE_URL}/rest/v1/notifications`, {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({
-        user_id: session.user.id,
+        user_id: userId,
         kind,
         actor_id: session.user.id,
-        actor_handle: session.user.user_metadata?.handle || 'user',
+        actor_handle: actorHandle || session.user.user_metadata?.handle || 'user',
         text,
         target: target || '',
         target_id: targetId || '',
       }),
     });
     return res.ok;
+  },
+
+  async getUserIdByHandle(handle) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?handle=eq.${encodeURIComponent(handle)}&select=id`, { headers: authHeaders() });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.[0]?.id || null;
+  },
+
+  // ===== Comment editing =====
+  async updateComment(commentId, body) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/comments?id=eq.${commentId}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ body }),
+    });
+    return res.ok;
+  },
+
+  // ===== Thread locking =====
+  async toggleLockPost(postId) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/posts?id=eq.${postId}&select=locked`, { headers: authHeaders() });
+    if (!res.ok) return false;
+    const data = await res.json();
+    const current = data?.[0]?.locked;
+    const next = current ? null : 1;
+    const upd = await fetch(`${SUPABASE_URL}/rest/v1/posts?id=eq.${postId}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ locked: next }),
+    });
+    return upd.ok;
+  },
+
+  // ===== User suspension =====
+  async suspendUser(userId, until) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ suspended_until: until || new Date(Date.now() + 86400000 * 7).toISOString() }),
+    });
+    return res.ok;
+  },
+
+  async unsuspendUser(userId) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ suspended_until: null }),
+    });
+    return res.ok;
+  },
+
+  // ===== Search =====
+  async searchPosts(query) {
+    const q = encodeURIComponent(query);
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/feed_view?or=(title.ilike.%25${q}%25,body.ilike.%25${q}%25)&order=created_at.desc`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  // ===== Polls =====
+  async createPoll(postId, question, options) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/polls`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ post_id: postId, question, options: JSON.stringify(options.map(o => ({ text: o, votes: 0 }))) }),
+    });
+    return res.ok ? res.json() : null;
+  },
+
+  async getPoll(pollId) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/polls?id=eq.${pollId}`, { headers: authHeaders() });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.[0] || null;
+  },
+
+  async getPollByPost(postId) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/polls?post_id=eq.${postId}`, { headers: authHeaders() });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.[0] || null;
+  },
+
+  async votePoll(pollId, optionIndex) {
+    const session = getSession();
+    if (!session?.user?.id) throw new Error('Not authenticated');
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/poll_votes`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ poll_id: pollId, user_id: session.user.id, option_index: optionIndex }),
+    });
+    return res.ok;
+  },
+
+  async getPollVotes(pollId) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/poll_votes?poll_id=eq.${pollId}`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  // ===== Badges =====
+  async awardBadge(userId, badgeId, label, icon) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/badges`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ user_id: userId, badge_id: badgeId, label: label || badgeId, icon: icon || 'medal' }),
+    });
+    return res.ok;
+  },
+
+  async getBadges(userId) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/badges?user_id=eq.${userId}&order=awarded_at.desc`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
   },
 };
 

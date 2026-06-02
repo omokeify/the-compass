@@ -21,6 +21,11 @@ const Icon = ({ name, size = 16, stroke = 1.6 }) => {
     case 'plus': return <svg {...props}><path d="M12 5v14M5 12h14" /></svg>;
     case 'pin': return <svg {...props}><path d="M12 17v5M9 9l-3 3 6 0M9 9l4-4 4 4-4 4M9 9l4 4" /></svg>;
     case 'lock': return <svg {...props}><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>;
+    case 'unlock': return <svg {...props}><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 7.5-3" /><path d="M18 5l-3 3" /></svg>;
+    case 'search': return <svg {...props}><circle cx="11" cy="11" r="7" /><path d="M16 16l5 5" /></svg>;
+    case 'medal': return <svg {...props}><path d="M8 4l1 5 3 1-3 1-1 5-2.5-4L3 16l1-5-1-5 4-2z" /><path d="M16 4l-1 5-3 1 3 1 1 5 2.5-4L21 16l-1-5 1-5-4-2z" /></svg>;
+    case 'flag': return <svg {...props}><path d="M5 2v20" /><path d="M5 3h11l-1.5 4L16 11H5z" /></svg>;
+    case 'pin': return <svg {...props}><path d="M12 2l3 7 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z" /></svg>;
     case 'flame': return <svg {...props}><path d="M12 3s5 4 5 9a5 5 0 0 1-10 0c0-2 1-3 2-4-1 4 3 2 3 5 0-3 2-4 0-10z" /></svg>;
     case 'check': return <svg {...props}><path d="M4 12l5 5L20 6" /></svg>;
     case 'eye': return <svg {...props}><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>;
@@ -29,6 +34,7 @@ const Icon = ({ name, size = 16, stroke = 1.6 }) => {
     case 'arrow-down': return <svg {...props}><path d="M12 5v14M5 12l7 7 7-7" /></svg>;
     case 'arrow-right': return <svg {...props}><path d="M5 12h14M13 5l7 7-7 7" /></svg>;
     case 'arrow-left': return <svg {...props}><path d="M19 12H5M11 19l-7-7 7-7" /></svg>;
+    case 'chevron-left': return <svg {...props}><path d="M15 6l-6 6 6 6" /></svg>;
     case 'send': return <svg {...props}><path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" /></svg>;
     case 'tag': return <svg {...props}><path d="M20 12l-9 9-8-8 9-9h8v8z" /><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none" /></svg>;
     case 'briefcase': return <svg {...props}><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" /></svg>;

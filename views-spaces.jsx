@@ -292,54 +292,138 @@ const EMOJIS = ['❤️', '🔥', '🎉', '👏', '😂', '🚀', '💯', '✨']
 const LiveSpaceDrawer = ({ space, onClose, currentUser }) => {
   const [selfMuted, setSelfMuted] = React.useState(true);
   const [minimized, setMinimized] = React.useState(false);
-  const [mutedByHost, setMutedByHost] = React.useState(new Set());
-  const [raisedHands, setRaisedHands] = React.useState([]);
-  const [speakers, setSpeakers] = React.useState(() => [space.host, ...(space.cohosts || [])]);
   const [emojis, setEmojis] = React.useState([]);
   const [showEndConfirm, setShowEndConfirm] = React.useState(false);
   const [micError, setMicError] = React.useState(null);
-  const streamRef = React.useRef(null);
+  const [remoteSpeakers, setRemoteSpeakers] = React.useState([]);
+  const [remoteListeners, setRemoteListeners] = React.useState([]);
+  const [raisedHands, setRaisedHands] = React.useState([]);
+  const [activeSpeakerId, setActiveSpeakerId] = React.useState(null);
+  const roomRef = React.useRef(null);
+  const audioRefs = React.useRef({});
 
   const isHost = currentUser?.handle === space.host;
   const isCoHost = space.cohosts?.includes(currentUser?.handle);
   const canManage = isHost || isCoHost;
-  const inSpeakers = speakers.includes(currentUser?.handle);
-  const syntheticHandles = space.syntheticListeners || [];
-  const listenerHandles = syntheticHandles.filter(h => !speakers.includes(h));
 
-  // Acquire / release mic on mute toggle
-  React.useEffect(() => {
-    if (!selfMuted && !mutedByHost.has(currentUser.handle)) {
-      navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(stream => { streamRef.current = stream; setMicError(null); })
-        .catch(err => { setMicError('Mic access denied'); });
-    } else {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
-        streamRef.current = null;
+  const LIVEKIT_URL = 'wss://compass-mhf9njtg.livekit.cloud';
+
+  const getToken = async () => {
+    const res = await fetch('/api/livekit-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identity: currentUser.handle, room: space.id, canPublish: true }),
+    });
+    const data = await res.json();
+    return data.token;
+  };
+
+  const buildParticipantsList = (room) => {
+    if (!room) return;
+    const speakers = [];
+    const listeners = [];
+    const handlesRaised = [];
+    room.remoteParticipants.forEach((p) => {
+      const identity = p.identity;
+      const hasAudio = Array.from(p.trackPublications.values()).some(
+        pub => pub.kind === 'audio' && pub.track && !pub.track.isMuted
+      );
+      if (hasAudio) {
+        speakers.push(p);
+      } else {
+        listeners.push(p);
       }
-    }
-  }, [selfMuted, mutedByHost.has(currentUser.handle)]);
+      try {
+        const meta = p.metadata ? JSON.parse(p.metadata) : {};
+        if (meta.hand) handlesRaised.push(identity);
+      } catch {}
+    });
+    // Sort speakers: host first, then cohosts, then rest
+    speakers.sort((a, b) => {
+      if (a.identity === space.host) return -1;
+      if (b.identity === space.host) return 1;
+      const aCo = space.cohosts?.includes(a.identity) ? 0 : 1;
+      const bCo = space.cohosts?.includes(b.identity) ? 0 : 1;
+      return aCo - bCo;
+    });
+    setRemoteSpeakers(speakers);
+    setRemoteListeners(listeners);
+    setRaisedHands(handlesRaised);
+  };
 
-  // Cleanup on unmount
+  // Connect to LiveKit on mount
   React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await getToken();
+        if (cancelled) return;
+        const Room = window.LivekitClient?.Room;
+        if (!Room) { setMicError('LiveKit SDK not loaded'); return; }
+        const room = new Room({
+          adaptiveStream: true,
+          dynacast: true,
+        });
+        roomRef.current = room;
+
+        room.on('participantConnected', () => buildParticipantsList(room));
+        room.on('participantDisconnected', () => buildParticipantsList(room));
+        room.on('trackSubscribed', (_track, _pub, participant) => {
+          if (_track.kind === 'audio') {
+            const container = document.getElementById('lk-audio-container');
+            if (container) {
+              const el = _track.attach();
+              container.appendChild(el);
+              audioRefs.current[participant.identity] = el;
+            }
+          }
+          buildParticipantsList(room);
+        });
+        room.on('trackUnsubscribed', (track, _pub, participant) => {
+          if (track.kind === 'audio') {
+            track.detach();
+            delete audioRefs.current[participant.identity];
+          }
+          buildParticipantsList(room);
+        });
+        room.on('trackMuted', (_pub, participant) => buildParticipantsList(room));
+        room.on('trackUnmuted', (_pub, participant) => buildParticipantsList(room));
+        room.on('participantMetadataChanged', () => buildParticipantsList(room));
+        room.on('activeSpeakersChanged', (speakers) => {
+          setActiveSpeakerId(speakers[0]?.identity || null);
+        });
+
+        await room.connect(LIVEKIT_URL, token);
+        if (cancelled) { room.disconnect(); return; }
+
+        // Host/co-host starts with mic on; listeners stay muted
+        if (isHost || isCoHost) {
+          try { await room.localParticipant.setMicrophoneEnabled(true); setSelfMuted(false); } catch {}
+        }
+        buildParticipantsList(room);
+      } catch (err) {
+        if (!cancelled) setMicError(err.message || 'Failed to connect');
+      }
+    })();
+
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
-        streamRef.current = null;
+      cancelled = true;
+      document.removeEventListener('keydown', onKey);
+      Object.values(audioRefs.current).forEach(el => el.remove());
+      audioRefs.current = {};
+      if (roomRef.current) {
+        roomRef.current.disconnect();
+        roomRef.current = null;
       }
     };
-  }, []);
+  }, [space.id, currentUser.handle]);
 
   const persistCohosts = async (newCohosts) => {
     await spaceService.update(space.id, { cohosts: newCohosts });
   };
-
-  React.useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
 
   const fireEmoji = (emoji) => {
     const id = Date.now() + Math.random();
@@ -347,54 +431,84 @@ const LiveSpaceDrawer = ({ space, onClose, currentUser }) => {
     setTimeout(() => setEmojis(prev => prev.filter(e => e.id !== id)), 2000);
   };
 
-  const toggleRaiseHand = () => {
-    if (inSpeakers) return;
-    if (raisedHands.includes(currentUser.handle)) {
-      setRaisedHands(prev => prev.filter(h => h !== currentUser.handle));
-    } else {
-      setRaisedHands(prev => [...prev, currentUser.handle]);
+  const toggleRaiseHand = async () => {
+    const room = roomRef.current;
+    if (!room) return;
+    const meta = (() => { try { return JSON.parse(room.localParticipant.metadata || '{}'); } catch { return {}; } })();
+    meta.hand = !meta.hand;
+    await room.localParticipant.setMetadata(JSON.stringify(meta));
+  };
+
+  const acceptHand = async (handle) => {
+    const room = roomRef.current;
+    if (!room) return;
+    const p = Array.from(room.remoteParticipants.values()).find(rp => rp.identity === handle);
+    if (p) {
+      const meta = (() => { try { return JSON.parse(p.metadata || '{}'); } catch { return {}; } })();
+      meta.hand = false;
+      await p.setMetadata(JSON.stringify(meta));
     }
   };
 
-  const acceptHand = (handle) => {
-    setRaisedHands(prev => prev.filter(h => h !== handle));
-    setSpeakers(prev => prev.includes(handle) ? prev : [...prev, handle]);
-  };
-
   const dismissHand = (handle) => {
-    setRaisedHands(prev => prev.filter(h => h !== handle));
+    acceptHand(handle);
   };
 
-  const makeCohost = (handle) => {
+  const makeCohost = async (handle) => {
+    await acceptHand(handle);
     const updated = [...(space.cohosts || []), handle];
-    persistCohosts(updated);
-    setSpeakers(prev => prev.includes(handle) ? prev : [...prev, handle]);
-    setRaisedHands(prev => prev.filter(h => h !== handle));
-    setMutedByHost(prev => { const n = new Set(prev); n.delete(handle); return n; });
+    await persistCohosts(updated);
+    const room = roomRef.current;
+    if (room) buildParticipantsList(room);
   };
 
-  const removeCohost = (handle) => {
+  const removeCohost = async (handle) => {
     const updated = (space.cohosts || []).filter(h => h !== handle);
-    persistCohosts(updated);
+    await persistCohosts(updated);
   };
 
-  const toggleHostMute = (handle) => {
-    setMutedByHost(prev => {
-      const next = new Set(prev);
-      if (next.has(handle)) next.delete(handle); else next.add(handle);
-      return next;
-    });
+  const toggleHostMute = async (handle) => {
+    const room = roomRef.current;
+    if (!room) return;
+    const p = Array.from(room.remoteParticipants.values()).find(rp => rp.identity === handle);
+    if (p) {
+      p.trackPublications.forEach(pub => {
+        if (pub.kind === 'audio') {
+          pub.setEnabled(!pub.track?.isMuted);
+        }
+      });
+    }
   };
 
-  const handleSelfMute = () => {
-    if (mutedByHost.has(currentUser.handle)) return;
-    setSelfMuted(m => !m);
+  const handleSelfMute = async () => {
+    const room = roomRef.current;
+    if (!room) return;
+    const next = !selfMuted;
+    setSelfMuted(next);
+    try {
+      await room.localParticipant.setMicrophoneEnabled(!next);
+    } catch (err) {
+      setSelfMuted(true);
+      setMicError('Mic access denied');
+    }
   };
 
   const confirmEnd = async () => {
-    await spaceService.delete(space.id);
+    const room = roomRef.current;
+    if (room) room.disconnect();
+    await spaceService.update(space.id, { status: 'replay', listeners: 0 });
     onClose();
   };
+
+  const getParticipantHandle = (p) => p.identity;
+  const isMyHandle = (h) => currentUser?.handle === h;
+
+  // Build speaker and listener handle lists for rendering
+  const speakerHandles = remoteSpeakers.map(getParticipantHandle);
+  const listenerHandles = remoteListeners.map(getParticipantHandle);
+  const myMeta = roomRef.current?.localParticipant?.metadata;
+  const myHandRaised = (() => { try { return myMeta ? JSON.parse(myMeta).hand : false; } catch { return false; } })();
+  const myMicOn = roomRef.current?.localParticipant?.isMicrophoneEnabled;
 
   if (minimized) {
     return (
@@ -402,7 +516,7 @@ const LiveSpaceDrawer = ({ space, onClose, currentUser }) => {
         <span className="space-live-pip" />
         <Avatar user={userByHandle(space.host)} size={26} />
         <span className="space-pip-title">{space.title}</span>
-        <span className="space-pip-listeners"><Icon name="users" size={11} /> {speakers.length + space.listeners}</span>
+        <span className="space-pip-listeners"><Icon name="users" size={11} /> {1 + remoteSpeakers.length + remoteListeners.length}</span>
       </button>
     );
   }
@@ -411,6 +525,7 @@ const LiveSpaceDrawer = ({ space, onClose, currentUser }) => {
     <>
       <div className="drawer-backdrop" onClick={onClose} />
       <aside className="space-drawer">
+        <div id="lk-audio-container" style={{ display: 'none' }} />
         <div className="sp-emoji-rain">
           {emojis.map(e => (
             <span key={e.id} className="sp-emoji-float" style={{ left: e.x + '%' }}>{e.emoji}</span>
@@ -420,7 +535,7 @@ const LiveSpaceDrawer = ({ space, onClose, currentUser }) => {
         <header className="sp-head">
           <div className="sp-head-status">
             <span className="space-live-pip" /> LIVE
-            <span className="sp-head-sub">· {speakers.length + space.listeners} in the room</span>
+            <span className="sp-head-sub">· {1 + remoteSpeakers.length + remoteListeners.length} in the room</span>
           </div>
           <div className="sp-head-tools">
             <button className="btn ghost icon-only" onClick={() => setMinimized(true)} title="Minimize">
@@ -459,48 +574,65 @@ const LiveSpaceDrawer = ({ space, onClose, currentUser }) => {
 
           <section className="sp-section">
             <div className="sp-section-head">
-              <span>Speaking · {speakers.length}</span>
-              {canManage && speakers.length > 1 && (
+              <span>Speaking · {1 + remoteSpeakers.length}</span>
+              {canManage && (1 + remoteSpeakers.length) > 1 && (
                 <div className="sp-section-actions" style={{ display: 'flex', gap: 4 }}>
-                  <button className="btn ghost sm" style={{ fontSize: 11 }} onClick={() => setMutedByHost(new Set(speakers.filter(h => h !== space.host)))}>Mute all</button>
-                  <button className="btn ghost sm" style={{ fontSize: 11 }} onClick={() => setMutedByHost(new Set())}>Unmute all</button>
+                  <button className="btn ghost sm" style={{ fontSize: 11 }} onClick={async () => {
+                    const room = roomRef.current;
+                    if (!room) return;
+                    remoteSpeakers.forEach(p => {
+                      if (p.identity !== space.host) {
+                        p.trackPublications.forEach(pub => { if (pub.kind === 'audio') pub.setEnabled(false); });
+                      }
+                    });
+                  }}>Mute all</button>
+                  <button className="btn ghost sm" style={{ fontSize: 11 }} onClick={async () => {
+                    const room = roomRef.current;
+                    if (!room) return;
+                    remoteSpeakers.forEach(p => {
+                      p.trackPublications.forEach(pub => { if (pub.kind === 'audio') pub.setEnabled(true); });
+                    });
+                  }}>Unmute all</button>
                 </div>
               )}
             </div>
             <div className="sp-grid">
-              {speakers.slice(0, 8).map((h, i) => {
+              {/* Self */}
+              <div key={currentUser.handle} className={`sp-person ${(myMicOn && !selfMuted) ? 'speaking' : ''}`}>
+                <div className="sp-avatar-wrap">
+                  <Avatar user={currentUser} size={56} />
+                  {(myMicOn && !selfMuted) && <span className="sp-speaking-ring" />}
+                  {selfMuted && <span className="sp-mute-pill"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M19 11a7 7 0 0 1-14 0M12 19v3"/></svg></span>}
+                </div>
+                <div className="sp-person-name">{currentUser.name?.split(' ')[0] || currentUser.handle}</div>
+                {isHost && <span className="sp-role-pill host">Host</span>}
+                {isCoHost && !isHost && <span className="sp-role-pill co">Co-host</span>}
+                {!isHost && !isCoHost && <span className="sp-role-pill" style={{ background: 'var(--surface-3)', color: 'var(--text-2)' }}>You</span>}
+                {!selfMuted && myMicOn && <span className="sp-mic-live" title="Mic active" />}
+              </div>
+              {/* Remote speakers */}
+              {remoteSpeakers.slice(0, 7).map(p => {
+                const h = p.identity;
                 const u = userByHandle(h);
-                const isHostUser = i === 0;
+                const isHostUser = h === space.host;
                 const isCo = !isHostUser && (space.cohosts || []).includes(h);
-                const isSelf = currentUser?.handle === h;
-                const mutedBy = mutedByHost.has(h);
-                const isActuallySpeaking = !mutedBy && !(isSelf && selfMuted);
+                const pub = Array.from(p.trackPublications.values()).find(x => x.kind === 'audio');
+                const muted = pub ? pub.track?.isMuted !== false : true;
+                const isSpeaking = h === activeSpeakerId && !muted;
                 return (
-                  <div key={h} className={`sp-person ${isActuallySpeaking ? 'speaking' : ''}`}>
+                  <div key={h} className={`sp-person ${isSpeaking ? 'speaking' : ''}`}>
                     <div className="sp-avatar-wrap">
                       <Avatar user={u} size={56} />
-                      {isActuallySpeaking && <span className="sp-speaking-ring" />}
-                      {mutedBy && <span className="sp-mute-pill"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M19 11a7 7 0 0 1-14 0M12 19v3"/></svg></span>}
+                      {isSpeaking && <span className="sp-speaking-ring" />}
+                      {muted && <span className="sp-mute-pill"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M19 11a7 7 0 0 1-14 0M12 19v3"/></svg></span>}
                     </div>
                     <div className="sp-person-name">{u.name?.split(' ')[0] || h}</div>
                     {isHostUser && <span className="sp-role-pill host">Host</span>}
                     {isCo && <span className="sp-role-pill co">Co-host</span>}
-                    {isSelf && !isHostUser && !isCo && <span className="sp-role-pill" style={{ background: 'var(--surface-3)', color: 'var(--text-2)' }}>You</span>}
-                    {canManage && !isSelf && (
-                      <button className="sp-host-mute" onClick={() => toggleHostMute(h)} title={mutedBy ? 'Unmute' : 'Mute'}>
+                    {canManage && !isHostUser && !isCo && (
+                      <button className="sp-host-mute" onClick={() => toggleHostMute(h)} title={muted ? 'Unmute' : 'Mute'}>
                         <Icon name="mic" size={11} />
                       </button>
-                    )}
-                    {isSelf && !mutedBy && (
-                      <button className={`sp-self-mute ${selfMuted ? '' : 'on'}`} onClick={handleSelfMute} title={selfMuted ? 'Unmute' : 'Mute self'}>
-                        <Icon name="mic" size={12} />
-                      </button>
-                    )}
-                    {isSelf && mutedBy && (
-                      <span className="sp-muted-by-host">Muted by host</span>
-                    )}
-                    {isSelf && !selfMuted && streamRef.current && (
-                      <span className="sp-mic-live" title="Mic active" />
                     )}
                     {isHost && isCo && (
                       <button className="sp-demote-cohost" onClick={() => removeCohost(h)} title="Remove as co-host"><Icon name="x" size={10} /></button>
@@ -512,20 +644,23 @@ const LiveSpaceDrawer = ({ space, onClose, currentUser }) => {
           </section>
 
           <section className="sp-section">
-            <div className="sp-section-head">Listeners · {space.listeners}</div>
+            <div className="sp-section-head">Listeners · {remoteListeners.length}</div>
             <div className="sp-listeners">
-              {listenerHandles.map(h => (
-                <div key={h} className="sp-listener-wrap">
-                  <Avatar user={userByHandle(h)} size={36} />
-                  {isHost && !raisedHands.includes(h) && (
-                    <button className="sp-sim-raise" onClick={() => setRaisedHands(prev => [...prev, h])} title="Simulate hand raise" style={{ background: 'var(--bg-3)', fontSize: 9 }}>✋</button>
-                  )}
-                  {isHost && (
-                    <button className="sp-invite-cohost" onClick={() => makeCohost(h)} title="Make co-host">👑</button>
-                  )}
-                </div>
-              ))}
-              <span className="sp-more">+{Math.max(0, space.listeners - listenerHandles.length)}</span>
+              {remoteListeners.map(p => {
+                const h = p.identity;
+                const u = userByHandle(h);
+                return (
+                  <div key={h} className="sp-listener-wrap">
+                    <Avatar user={u} size={36} />
+                    {isHost && (
+                      <button className="sp-invite-cohost" onClick={() => makeCohost(h)} title="Make co-host">👑</button>
+                    )}
+                  </div>
+                );
+              })}
+              {remoteListeners.length === 0 && (
+                <span style={{ fontSize: 13, color: 'var(--text-3)' }}>No listeners yet</span>
+              )}
             </div>
           </section>
         </div>
@@ -544,22 +679,19 @@ const LiveSpaceDrawer = ({ space, onClose, currentUser }) => {
             </button>
           )}
           <button
-            className={`sp-ctrl ${selfMuted || mutedByHost.has(currentUser.handle) ? '' : 'on'}`}
+            className={`sp-ctrl ${selfMuted ? '' : 'on'}`}
             onClick={handleSelfMute}
-            disabled={mutedByHost.has(currentUser.handle)}
           >
             <Icon name="mic" size={16} />
-            <span>{micError ? 'No mic' : mutedByHost.has(currentUser.handle) ? 'Muted' : selfMuted ? 'Muted' : 'Speaking'}</span>
+            <span>{micError ? 'No mic' : selfMuted ? 'Muted' : 'Speaking'}</span>
           </button>
-          {!inSpeakers && (
-            <button
-              className={`sp-ctrl ${raisedHands.includes(currentUser.handle) ? 'on' : ''}`}
-              onClick={toggleRaiseHand}
-            >
-              <span style={{ fontSize: 16, lineHeight: 1 }}>✋</span>
-              <span>{raisedHands.includes(currentUser.handle) ? 'Requested' : 'Raise hand'}</span>
-            </button>
-          )}
+          <button
+            className={`sp-ctrl ${myHandRaised ? 'on' : ''}`}
+            onClick={toggleRaiseHand}
+          >
+            <span style={{ fontSize: 16, lineHeight: 1 }}>✋</span>
+            <span>{myHandRaised ? 'Requested' : 'Raise hand'}</span>
+          </button>
           <button className="sp-ctrl">
             <Icon name="reply" size={16} />
             <span>Share</span>

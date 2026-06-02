@@ -195,6 +195,17 @@ const TopicPage = ({ topicId, navigate, currentUser }) => {
 };
 
 // ---------- Profile (dashboard layout) ----------
+const canShowGigs = (user) => {
+  if (!user) return false;
+  if (user.role === 'admin' || user.role === 'mod') return true;
+  const level = getUserLevel(user);
+  if (level >= 5) return true;
+  try {
+    const approved = JSON.parse(localStorage.getItem('compass_approved_talents_v1') || '[]');
+    return approved.includes(user.handle);
+  } catch { return false; }
+};
+
 const PROFILE_MENU = [
   { id: 'overview',      label: 'Overview',          icon: 'home' },
   { id: 'edit',          label: 'Edit Profile',      icon: 'gear' },
@@ -239,8 +250,14 @@ const ProfilePage = ({ handle, navigate, tab, currentUser }) => {
   const [u, setU] = React.useState(userByHandle(actualHandle));
   const isMe = actualHandle === currentUser?.handle;
   const [active, setActive] = React.useState(tab || 'overview');
+  const menuItems = PROFILE_MENU.filter(item => item.id !== 'portfolio' || canShowGigs(currentUser));
   React.useEffect(() => { if (tab) setActive(tab); }, [tab]);
   React.useEffect(() => { fetchUserByHandle(actualHandle).then(setU); }, [actualHandle]);
+  React.useEffect(() => {
+    const handler = (e) => { if (e.detail) setU(e.detail); };
+    window.addEventListener('compass_profile_saved', handler);
+    return () => window.removeEventListener('compass_profile_saved', handler);
+  }, []);
 
   const selectTab = (nextTab) => {
     setActive(nextTab);
@@ -270,11 +287,11 @@ const ProfilePage = ({ handle, navigate, tab, currentUser }) => {
             <div className="dm-user-body">
               <div className="dm-user-name">{u.name}</div>
               <div className="dm-user-role">{u.tier} @ Compass</div>
-              <div className="dm-user-mail">{u.handle.replace('.eth','').replace('.','')}{'@compass.community'}</div>
+              <div className="dm-user-mail">@{u.handle}</div>
             </div>
           </button>
           <nav className="dm-list">
-            {PROFILE_MENU.map(item => (
+            {menuItems.map(item => (
               <button
                 key={item.id}
                 className={`dm-item ${active === item.id ? 'active' : ''} ${item.danger ? 'danger' : ''}`}
@@ -296,6 +313,49 @@ const ProfilePage = ({ handle, navigate, tab, currentUser }) => {
          </main>
       </div>
     </div>
+  );
+};
+
+const FollowListModal = ({ u, mode, onClose, navigate }) => {
+  const [list, setList] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  React.useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const data = mode === 'followers'
+          ? await supabaseService.getFollowers(u.id)
+          : await supabaseService.getFollowing(u.id);
+        const userIds = data.map(d => mode === 'followers' ? d.follower_id : d.following_id);
+        const profiles = await Promise.all(userIds.map(id => supabaseService.getProfile(id).catch(() => null)));
+        setList(profiles.filter(Boolean));
+      } catch {}
+      setLoading(false);
+    })();
+  }, [u.id, mode]);
+  return (
+    <>
+      <div className="drawer-backdrop" onClick={onClose} />
+      <aside className="notif-drawer" style={{ width: 360 }}>
+        <header className="nd-head">
+          <h2 className="nd-title">{mode === 'followers' ? 'Followers' : 'Following'}</h2>
+          <button className="btn ghost icon-only" onClick={onClose}><Icon name="x" size={14} /></button>
+        </header>
+        <ul className="nd-list">
+          {loading && <li className="nd-empty">Loading...</li>}
+          {!loading && list.length === 0 && <li className="nd-empty">None yet.</li>}
+          {list.map(p => (
+              <li key={p.id} className="nd-row" onClick={() => { navigate({ view: 'profile', handle: p.handle }); onClose(); }} style={{ cursor: 'pointer' }}>
+              <Avatar user={p} size={36} />
+              <div className="nd-body">
+                <div className="nd-text"><strong>{p.fullname || p.handle}</strong></div>
+                <div className="nd-when">@{p.handle}</div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </aside>
+    </>
   );
 };
 
@@ -321,6 +381,10 @@ const PublicProfilePage = ({ u, activeTab, selectTab, navigate }) => {
     return readFollowingList().includes(u.handle);
   });
 
+  const [followerCount, setFollowerCount] = React.useState(0);
+  const [followingCount, setFollowingCount] = React.useState(0);
+  const [followModal, setFollowModal] = React.useState(null);
+
   React.useEffect(() => {
     const sync = () => {
       setFollowing(readFollowingList().includes(u.handle));
@@ -334,6 +398,17 @@ const PublicProfilePage = ({ u, activeTab, selectTab, navigate }) => {
       window.removeEventListener('compass_availability_changed', sync);
     };
   }, [u.handle]);
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const followers = await supabaseService.getFollowers(u.id);
+        setFollowerCount(followers.length);
+        const following = await supabaseService.getFollowing(u.id);
+        setFollowingCount(following.length);
+      } catch {}
+    })();
+  }, [u.id]);
 
   const toggleFollowProfile = () => {
     toggleFollow(u.handle);
@@ -349,7 +424,8 @@ const PublicProfilePage = ({ u, activeTab, selectTab, navigate }) => {
 
   return (
     <div className="view public-profile">
-      <div className="prof-cover-sm" style={{ '--cover-bg': `linear-gradient(120deg, oklch(0.55 0.18 ${u.hue}), oklch(0.32 0.12 ${u.hue}))` }}>
+      {followModal && <FollowListModal u={u} mode={followModal} onClose={() => setFollowModal(null)} navigate={navigate} />}
+      <div className="prof-cover-sm" style={u.banner ? { backgroundImage: `url(${u.banner})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { '--cover-bg': `linear-gradient(120deg, oklch(0.55 0.18 ${u.hue}), oklch(0.32 0.12 ${u.hue}))` }}>
         <div className="prof-cover-grid" />
         <div className="prof-cover-tag">
           <TierBadge tier={u.tier} />
@@ -381,9 +457,17 @@ const PublicProfilePage = ({ u, activeTab, selectTab, navigate }) => {
           <p className="pp-bio">{u.bio || 'Smart contract builder and Web3 developer contributing to the Compass community.'}</p>
           
           <div className="pp-meta-strip">
-            <div className="pp-meta-item">
+            <div className="pp-meta-item" style={{ cursor: 'default' }}>
               <span className="pp-meta-val">{formatNum(u.kp)}</span>
               <span className="pp-meta-lbl">KP score</span>
+            </div>
+            <div className="pp-meta-item" onClick={() => setFollowModal('followers')} style={{ cursor: 'pointer' }}>
+              <span className="pp-meta-val">{followerCount}</span>
+              <span className="pp-meta-lbl">Followers</span>
+            </div>
+            <div className="pp-meta-item" onClick={() => setFollowModal('following')} style={{ cursor: 'pointer' }}>
+              <span className="pp-meta-val">{followingCount}</span>
+              <span className="pp-meta-lbl">Following</span>
             </div>
           </div>
         </div>
@@ -613,9 +697,9 @@ const GigEditorModal = ({ gig, onSave, onClose }) => {
   );
 };
 
-const DashboardPanel = ({ u, tab, navigate }) => {
+const DashboardPanel = ({ u, tab, navigate, currentUser }) => {
   if (tab === 'overview')      return <DashOverview u={u} navigate={navigate} />;
-  if (tab === 'edit')          return <DashEditProfile u={u} />;
+  if (tab === 'edit')          return <DashEditProfile u={u} currentUser={currentUser} />;
   if (tab === 'saved')         return <SavedPage navigate={navigate} embedded />;
   if (tab === 'wallet')        return <WalletPage navigate={navigate} currentUser={currentUser} embedded />;
   if (tab === 'groups')        return <DashGroups u={u} />;
@@ -641,7 +725,88 @@ const PanelHeader = ({ kicker, title, sub, action }) => (
   </header>
 );
 
+const KPProgress = ({ kp }) => {
+  const level = getLevelFromKp(kp);
+  const nextThreshold = LEVEL_THRESHOLDS[level] || LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1];
+  const prevThreshold = LEVEL_THRESHOLDS[level - 1] || 0;
+  const progress = nextThreshold > prevThreshold ? ((kp - prevThreshold) / (nextThreshold - prevThreshold)) * 100 : 100;
+  const nextName = LEVEL_NAMES[level] || LEVEL_NAMES[LEVEL_NAMES.length - 1];
+  return (
+    <div className="kp-progress" style={{ margin: '12px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888', marginBottom: 4 }}>
+        <span>{LEVEL_NAMES[level - 1]} · Level {level}</span>
+        <span>{kp} / {nextThreshold} KP → {nextName}</span>
+      </div>
+      <div style={{ height: 8, background: '#e0e0e0', borderRadius: 4, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${Math.min(progress, 100)}%`, background: 'linear-gradient(90deg, #6366f1, #8b5cf6)', borderRadius: 4, transition: 'width 0.3s' }} />
+      </div>
+    </div>
+  );
+};
+
+const BadgesRow = ({ userId }) => {
+  const [badges, setBadges] = React.useState([]);
+  React.useEffect(() => {
+    if (userId && supabaseService?.getBadges) {
+      supabaseService.getBadges(userId).then(setBadges).catch(() => {});
+    }
+  }, [userId]);
+  if (badges.length === 0) return null;
+  return (
+    <div className="badges-row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '12px 0' }}>
+      {badges.map(b => (
+        <span key={b.id} className="badge-chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 20, fontSize: 12, background: '#f0f0f0', color: '#555' }}>
+          <Icon name={b.icon || 'medal'} size={11} /> {b.label}
+        </span>
+      ))}
+    </div>
+  );
+};
+
+const QuestPanel = ({ userId }) => {
+  const [quests, setQuests] = React.useState([]);
+  React.useEffect(() => {
+    questService.today().then(setQuests).catch(() => {});
+  }, [userId]);
+  const complete = async (id) => {
+    const ok = await questService.complete(id);
+    if (ok) setQuests(prev => prev.map(q => q.id === id ? { ...q, done: true } : q));
+  };
+  return (
+    <div className="quest-panel" style={{ marginTop: 16, padding: 16, background: '#f9f9f9', borderRadius: 8, border: '1px solid #e0e0e0' }}>
+      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Daily quests</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {quests.map(q => (
+          <div key={q.id} className={`quest-row ${q.done ? 'done' : ''}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', borderRadius: 6, background: q.done ? '#e8f5e9' : '#fff', border: '1px solid #e0e0e0' }}>
+            <div>
+              <span style={{ fontWeight: 500, fontSize: 13 }}>{q.label}</span>
+              <span style={{ fontSize: 11, color: '#888', marginLeft: 6 }}>+{q.kp} KP</span>
+            </div>
+            {q.done ? (
+              <Icon name="check" size={14} style={{ color: '#4caf50' }} />
+            ) : (
+              <button className="btn primary xs" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => complete(q.id)}>Complete</button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const DashOverview = ({ u, navigate }) => {
+  const [followerCount, setFollowerCount] = React.useState(0);
+  const [postCount, setPostCount] = React.useState(0);
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const followers = await supabaseService.getFollowers(u.id);
+        setFollowerCount(followers.length);
+        const posts = await supabaseService.getPosts({ authorId: u.id });
+        setPostCount(posts.length);
+      } catch {}
+    })();
+  }, [u.id]);
   return (
     <>
       <PanelHeader
@@ -649,18 +814,21 @@ const DashOverview = ({ u, navigate }) => {
         title={`Hi, ${u.name.split(' ')[0]}.`}
         sub="Here's your bearing this month — KP, validations, and what's on the horizon."
       />
-      <div className="prof-cover-sm" style={{ '--cover-bg': `linear-gradient(120deg, oklch(0.55 0.18 ${u.hue}), oklch(0.32 0.12 ${u.hue}))` }}>
+      <div className="prof-cover-sm" style={u.banner ? { backgroundImage: `url(${u.banner})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { '--cover-bg': `linear-gradient(120deg, oklch(0.55 0.18 ${u.hue}), oklch(0.32 0.12 ${u.hue}))` }}>
         <div className="prof-cover-grid" />
         <div className="prof-cover-tag">
           <TierBadge tier={u.tier} />
           <span>· Bearing 038°</span>
         </div>
       </div>
+      <KPProgress kp={u.kp || 0} />
+      <BadgesRow userId={u.id} />
       <div className="dash-stats">
-        {[['0','KP this month'], ['0','Posts'], ['0','Replies'], ['0','Followers']].map(([n,l]) => (
+        {[[u.kp,'KP total'], [postCount,'Posts'], ['0','Replies'], [followerCount,'Followers']].map(([n,l]) => (
           <div key={l} className="ds-cell"><div className="ds-n">{n}</div><div className="ds-l">{l}</div></div>
         ))}
       </div>
+      <QuestPanel userId={u.id} />
     </>
   );
 };
@@ -675,7 +843,19 @@ const Field = ({ label, value, type = 'text', textarea, hint }) => (
   </label>
 );
 
-const DashEditProfile = ({ u }) => {
+const DashEditProfile = ({ u, currentUser }) => {
+  const [name, setName] = React.useState(u.name || '');
+  const [handle, setHandle] = React.useState(u.handle || '');
+  const [bio, setBio] = React.useState(u.bio || '');
+  const [loc, setLoc] = React.useState(u.loc || '');
+  const [x, setX] = React.useState(u.x || '');
+  const [farcaster, setFarcaster] = React.useState(u.farcaster || '');
+  const [avatarDataUrl, setAvatarDataUrl] = React.useState(null);
+  const [bannerDataUrl, setBannerDataUrl] = React.useState(null);
+  const avatarInputRef = React.useRef(null);
+  const bannerInputRef = React.useRef(null);
+  const [handleCheck, setHandleCheck] = React.useState(null);
+
   const [availability, setAvailability] = React.useState(() => {
     return localStorage.getItem(`compass_availability_${u.handle}`) || 'Mentoring';
   });
@@ -686,21 +866,75 @@ const DashEditProfile = ({ u }) => {
     window.dispatchEvent(new Event('compass_availability_changed'));
   };
 
+  const handleFile = (file, setter) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => setter(e.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  const checkHandle = async () => {
+    if (!handle.trim() || handle === u.handle) { setHandleCheck(null); return; }
+    try {
+      const existing = await supabaseService.checkHandle(handle.trim());
+      setHandleCheck(existing ? 'taken' : 'available');
+    } catch { setHandleCheck(null); }
+  };
+
+  const handleSave = async () => {
+    const sb = window.supabaseService;
+    if (!sb?.getSession()?.access_token) return;
+    const updates = { fullname: name, bio, loc };
+    if (handle.trim() && handle !== u.handle) updates.handle = handle.trim();
+    if (x) updates.x = x;
+    if (farcaster) updates.farcaster = farcaster;
+    if (avatarDataUrl) updates.avatar = avatarDataUrl;
+    if (bannerDataUrl) updates.banner = bannerDataUrl;
+    try {
+      await sb.updateProfile(u.id, updates);
+      const updated = { ...u, handle: updates.handle || u.handle, name, fullname: name, bio, loc, x, farcaster, avatar: avatarDataUrl || u.avatar };
+      const oldHandle = u.handle;
+      const newHandle = updates.handle || oldHandle;
+      if (oldHandle !== newHandle) {
+        delete PROFILE_CACHE[oldHandle];
+        PROFILE_CACHE[newHandle] = updated;
+        window.currentUser.handle = newHandle;
+      } else {
+        PROFILE_CACHE[oldHandle] = updated;
+      }
+      if (window.currentUser) Object.assign(window.currentUser, updated);
+      window.dispatchEvent(new CustomEvent('compass_profile_saved', { detail: updated }));
+      if (window.showToast) window.showToast('Profile saved');
+    } catch (e) {
+      if (window.showToast) window.showToast(e.message || 'Failed to save');
+    }
+  };
+
   return (
     <>
       <PanelHeader
         kicker="Account"
         title="Edit your profile."
         sub="What you change here is visible to everyone in the community."
-        action={<button className="btn primary">Save changes</button>}
+        action={<button className="btn primary" onClick={handleSave}>Save changes</button>}
       />
       <div className="dash-card">
         <div className="edit-avatar-row">
-          <Avatar user={u} size={80} ring />
+          <Avatar user={{ ...u, avatar: avatarDataUrl || u.avatar }} size={80} ring />
           <div>
-            <button className="btn solid sm">Upload photo</button>
-            <button className="btn ghost sm" style={{ marginLeft: 8 }}>Remove</button>
+            <input ref={avatarInputRef} type="file" accept="image/png,image/jpeg" style={{ display: 'none' }} onChange={e => handleFile(e.target.files?.[0], setAvatarDataUrl)} />
+            <button className="btn solid sm" onClick={() => avatarInputRef.current?.click()}>Upload photo</button>
+            <button className="btn ghost sm" style={{ marginLeft: 8 }} onClick={() => setAvatarDataUrl(null)}>Remove</button>
             <p className="field-hint" style={{ marginTop: 8 }}>PNG or JPG. Max 2MB.</p>
+          </div>
+        </div>
+
+        <div className="edit-banner-row" style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 200, height: 60, borderRadius: 8, background: bannerDataUrl ? `url(${bannerDataUrl}) center/cover` : `linear-gradient(120deg, oklch(0.55 0.18 ${u.hue}), oklch(0.32 0.12 ${u.hue}))`, border: '1px solid var(--border)' }} />
+          <div>
+            <input ref={bannerInputRef} type="file" accept="image/png,image/jpeg" style={{ display: 'none' }} onChange={e => handleFile(e.target.files?.[0], setBannerDataUrl)} />
+            <button className="btn solid sm" onClick={() => bannerInputRef.current?.click()}>Change banner</button>
+            <button className="btn ghost sm" style={{ marginLeft: 8 }} onClick={() => setBannerDataUrl(null)}>Remove</button>
           </div>
         </div>
 
@@ -721,15 +955,26 @@ const DashEditProfile = ({ u }) => {
         </div>
 
         <div className="field-grid">
-          <Field label="Full name" value={u.name} />
-          <Field label="Handle" value={u.handle} hint="compass.community/@your-handle" />
-          <Field label="Email" value={u.email || ''} type="email" />
-          <Field label="Location" value={u.loc} />
-          <div style={{ gridColumn: '1 / -1' }}>
-            <Field label="Bio" value={u.bio} textarea />
+          <div><label className="field-label">Full name</label><input className="field-input" value={name} onChange={e => setName(e.target.value)} /></div>
+          <div>
+            <label className="field-label">Handle</label>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input className="field-input" style={{ flex: 1 }} value={handle} onChange={e => { setHandle(e.target.value); setHandleCheck(null); }} onBlur={checkHandle} placeholder="your-handle" />
+              {handle !== u.handle && handle.trim() && (
+                <span style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                  {handleCheck === 'available' && <span style={{ color: '#4caf50' }}>Available</span>}
+                  {handleCheck === 'taken' && <span style={{ color: '#f44336' }}>Taken</span>}
+                  {!handleCheck && <span style={{ color: '#888' }}>(check on blur)</span>}
+                </span>
+              )}
+            </div>
+            <span className="field-hint">compass.community/@{handle || 'your-handle'}</span>
           </div>
-          <Field label="X / Twitter" value={u.x || ''} />
-          <Field label="Farcaster" value={u.farcaster || ''} />
+          <div><label className="field-label">Email</label><input className="field-input" type="email" value={u.email || ''} disabled /></div>
+          <div><label className="field-label">Location</label><input className="field-input" value={loc} onChange={e => setLoc(e.target.value)} /></div>
+          <div style={{ gridColumn: '1 / -1' }}><label className="field-label">Bio</label><textarea className="field-input" rows={4} value={bio} onChange={e => setBio(e.target.value)} /></div>
+          <div><label className="field-label">X / Twitter</label><input className="field-input" value={x} onChange={e => setX(e.target.value)} /></div>
+          <div><label className="field-label">Farcaster</label><input className="field-input" value={farcaster} onChange={e => setFarcaster(e.target.value)} /></div>
         </div>
       </div>
     </>
@@ -957,15 +1202,42 @@ const DashCourses = ({ u }) => {
 };
 
 const DashContributions = ({ u, navigate }) => {
+  const [posts, setPosts] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  React.useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const data = await supabaseService.getPosts({ authorId: u.id });
+        setPosts(data || []);
+      } catch {}
+      setLoading(false);
+    })();
+  }, [u.id]);
+  const total = posts.length;
+  const kpEarned = u.kp || 0;
   return (
     <>
-      <PanelHeader kicker="Your activity" title="My contributions." sub="Every post, reply, validation and bounty submission." />
+      <PanelHeader kicker="Your activity" title="My contributions." sub="Every post you've published." />
       <div className="dash-stats">
-        {[['0','Posts'], ['0','Replies'], ['0','Validated alphas'], ['0','KP earned']].map(([n,l]) => (
+        {[[total,'Posts'], ['0','Replies'], ['0','Validated alphas'], [kpEarned,'KP earned']].map(([n,l]) => (
           <div key={l} className="ds-cell"><div className="ds-n">{n}</div><div className="ds-l">{l}</div></div>
         ))}
       </div>
-      <div className="empty">Nothing yet — let's change that.</div>
+      {loading ? (
+        <div className="empty">Loading...</div>
+      ) : posts.length === 0 ? (
+        <div className="empty">Nothing yet — let's change that.</div>
+      ) : (
+        <div style={{ marginTop: 16 }}>
+          {posts.map(p => (
+            <div key={p.id} className="dash-post-row" style={{ padding: '10px 0', borderBottom: '1px solid #eee', cursor: 'pointer' }} onClick={() => navigate({ view: 'topic', topic: p.id })}>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{p.title}</div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{p.cat} · {new Date(p.created_at).toLocaleDateString()}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 };

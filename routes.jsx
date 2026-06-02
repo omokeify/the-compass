@@ -13,6 +13,7 @@ function routeFromPath(pathname = window.location.pathname) {
 
   if (!root) return DEFAULT_ROUTE;
   if (root === 'feed') return { view: 'feed' };
+  if (root === 'search') return { view: 'search' };
   if (root === 'talent') return a ? { view: 'gig', id: a } : { view: 'talent' };
   if (root === 'gigs') return a ? { view: 'gig', id: a } : { view: 'talent' };
   if (root === 'spaces') return { view: 'spaces' };
@@ -36,6 +37,7 @@ function routeToPath(route = DEFAULT_ROUTE) {
 
   if (route.view === 'home') return '/';
   if (route.view === 'feed') return '/feed';
+  if (route.view === 'search') return '/search';
   if (route.view === 'talent') return '/talent';
   if (route.view === 'gig') return `/talent/${enc(route.id)}`;
   if (route.view === 'spaces') return '/spaces';

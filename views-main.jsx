@@ -1,7 +1,7 @@
 // Main views: Home, Category, Topic — modern light edition
 
 // ---------- HOME ----------
-const HomeFeed = ({ navigate, currentUser, onCompose, onSignup, onJoinClass }) => {
+const HomeFeed = ({ navigate, currentUser, onCompose, onSignup, onJoinClass, onJoinSpace }) => {
   const liveClass = (window.CONFERENCES || []).find(c => c.status === 'live');
   return (
     <div className="view home">
@@ -30,11 +30,11 @@ const HomeFeed = ({ navigate, currentUser, onCompose, onSignup, onJoinClass }) =
       </FadeUp>
 
       <FadeUp>
-        <SpacesSection navigate={navigate} />
+        <SpacesSection navigate={navigate} onJoinSpace={onJoinSpace} />
       </FadeUp>
 
       <FadeUp>
-        <HomeFeedStream navigate={navigate} onCompose={onCompose} />
+        <HomeFeedStream navigate={navigate} onCompose={onCompose} currentUser={currentUser} />
       </FadeUp>
 
       <FadeUp>
@@ -61,7 +61,7 @@ const HomeFeed = ({ navigate, currentUser, onCompose, onSignup, onJoinClass }) =
 };
 
 // ---------- Home Feed Stream — uses real FeedCard ----------
-const HomeFeedStream = ({ navigate, onCompose }) => {
+const HomeFeedStream = ({ navigate, onCompose, currentUser }) => {
   const items = (window.FEED_ITEMS || []).slice(0, 4);
   return (
     <div className="section">
@@ -103,7 +103,7 @@ const HomeFeedStream = ({ navigate, onCompose }) => {
             <div className="rail-card-head"><span className="rail-card-title">Trending</span></div>
             <ul className="rail-tags">
               {TRENDING_TAGS.slice(0, 6).map(t => (
-                <li key={t.tag} className="rail-tag">
+                <li key={t.tag} className="rail-tag" onClick={() => navigate({ view: 'tag', tag: t.tag })} style={{ cursor: 'pointer' }}>
                   <span className="rt-h">#</span>{t.tag}
                   <span className="rt-c">{t.count}</span>
                 </li>
@@ -113,8 +113,8 @@ const HomeFeedStream = ({ navigate, onCompose }) => {
           <div className="rail-card">
             <div className="rail-card-head"><span className="rail-card-title">Who to follow</span></div>
             <ul className="rail-users">
-              {[...USERS].sort((a,b)=>b.kp-a.kp).slice(0,3).map(u => (
-                <li key={u.handle} className="rail-user" onClick={() => navigate({ view: 'profile', handle: u.handle })}>
+              {(window.SUGGESTED_USERS || []).slice(0,3).map(u => (
+                <li key={u.id} className="rail-user" onClick={() => navigate({ view: 'profile', handle: u.handle })}>
                   <Avatar user={u} size={28} />
                   <div className="ru-body">
                     <div className="ru-name">{u.name}</div>
@@ -218,11 +218,16 @@ const ContentSection = ({ navigate }) => {
 };
 
 // ---------- Spaces Section (home page) ----------
-const SpacesSection = ({ navigate }) => {
+const SpacesSection = ({ navigate, onJoinSpace }) => {
   const live = SPACES.filter(s => s.status === 'live');
   const upcoming = SPACES.filter(s => s.status === 'scheduled').slice(0, 3);
 
   if (live.length === 0 && upcoming.length === 0) return null;
+
+  const handleJoin = async (s) => {
+    await spaceService.bumpListeners(s.id, 1);
+    onJoinSpace && onJoinSpace(s);
+  };
 
   return (
     <div className="section">
@@ -240,7 +245,7 @@ const SpacesSection = ({ navigate }) => {
         </div>
       </div>
       <div className="spaces-grid" style={{ marginTop: 8 }}>
-        {live.map(s => <SpaceCard key={s.id} space={s} onJoin={() => spaceService.bumpListeners(s.id, 1)} navigate={navigate} />)}
+        {live.map(s => <SpaceCard key={s.id} space={s} onJoin={() => handleJoin(s)} navigate={navigate} />)}
         {upcoming.map(s => <SpaceCard key={s.id} space={s} onJoin={() => {}} navigate={navigate} />)}
       </div>
     </div>
@@ -449,7 +454,11 @@ const DiscussionsSection = ({ navigate, currentUser }) => {
 
 // ---------- Members Section ----------
 const MembersSection = ({ navigate }) => {
-  const top = [...USERS].sort((a, b) => b.kp - a.kp).slice(0, 5);
+  const [top, setTop] = React.useState([]);
+  React.useEffect(() => {
+    const sb = window.supabaseService;
+    sb?.getTopMembers(5).then(setTop).catch(() => {});
+  }, []);
   return (
     <div className="section">
       <div className="section-head">
@@ -634,15 +643,70 @@ const CategoryPage = ({ catId, navigate, onCompose, currentUser, showToast }) =>
 };
 
 // ============================ CONTENT MANAGEMENT (Mod/Admin) ============================
+const FlaggedItem = ({ flag, onResolve }) => {
+  const [details, setDetails] = React.useState(null);
+  React.useEffect(() => {
+    (async () => {
+      if (flag.target_type === 'post') {
+        const post = await supabaseService.getPost(flag.target_id);
+        setDetails(post);
+      }
+    })();
+  }, [flag]);
+  return (
+    <div className="flag-row" style={{ padding: '12px 16px', borderBottom: '1px solid #e0e0e0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{flag.reason}</div>
+          <div style={{ fontSize: 12, color: '#888' }}>on {flag.target_type} · {new Date(flag.created_at).toLocaleString()}</div>
+          {details && <div style={{ fontSize: 13, marginTop: 4, color: '#444' }}>"{details.title?.slice(0, 100)}"</div>}
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button className="btn primary xs" onClick={() => onResolve(flag.id, true)} style={{ fontSize: 12, padding: '4px 10px' }}>Resolve</button>
+          <button className="btn ghost xs" onClick={() => onResolve(flag.id, false)} style={{ fontSize: 12, padding: '4px 10px' }}>Dismiss</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ContentPage = ({ navigate, currentUser }) => {
   const canManage = canCreateEvent(currentUser);
   if (!canManage) return <div className="view"><div className="empty">Access restricted to moderators and admins.</div></div>;
+  const [modTab, setModTab] = React.useState('content');
+  const [flags, setFlags] = React.useState([]);
+  React.useEffect(() => {
+    if (modTab === 'moderation') {
+      supabaseService.getFlags('open').then(setFlags).catch(() => {});
+    }
+  }, [modTab]);
+  const resolveFlag = async (id, resolved) => {
+    await supabaseService.resolveFlag(id, resolved);
+    setFlags(prev => prev.filter(f => f.id !== id));
+  };
+  if (modTab === 'moderation') {
+    return (
+      <div className="view">
+        <section className="lb-hero">
+          <div className="section-eyebrow"><span className="section-eyebrow-dot" /> Moderation</div>
+          <h1 className="section-title" style={{ fontSize: 'clamp(32px,4vw,48px)' }}>Flag queue.</h1>
+          <p className="section-sub">{flags.length} open flag{flags.length !== 1 ? 's' : ''} waiting for review.</p>
+          <button className="btn ghost sm" onClick={() => setModTab('content')} style={{ marginTop: 8 }}><Icon name="arrow-left" size={11} /> Back to content</button>
+        </section>
+        <div style={{ marginTop: 24, border: '1px solid #e0e0e0', borderRadius: 8 }}>
+          {flags.length === 0 && <div className="empty" style={{ padding: 32 }}>No open flags. All clear.</div>}
+          {flags.map(f => <FlaggedItem key={f.id} flag={f} onResolve={resolveFlag} />)}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="view">
       <section className="lb-hero">
         <div className="section-eyebrow"><span className="section-eyebrow-dot" /> Editorial</div>
         <h1 className="section-title" style={{ fontSize: 'clamp(32px,4vw,48px)' }}>Content manager.</h1>
         <p className="section-sub">Publish and manage editorial content — partner spotlights, research, field notes, tutorials, and more.</p>
+        <button className="btn ghost sm" onClick={() => setModTab('moderation')} style={{ marginTop: 8 }}><Icon name="alert" size={11} /> Moderation queue ({flags.length})</button>
       </section>
       <div className="content-grid" style={{ marginTop: 24 }}>
         {CONTENT_ITEMS.map(item => {

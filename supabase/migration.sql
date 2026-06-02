@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS public.posts (
   author_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   title TEXT NOT NULL,
   body TEXT DEFAULT '',
+  tags TEXT[] DEFAULT '{}',
   type TEXT DEFAULT 'Signal',
   cat TEXT DEFAULT 'news',
   media JSONB DEFAULT NULL,
@@ -184,6 +185,25 @@ LEFT JOIN (SELECT post_id, COUNT(*) AS comment_count FROM public.comments GROUP 
 LEFT JOIN (SELECT post_id, COUNT(*) AS repost_count FROM public.reactions WHERE type = 'repost' GROUP BY post_id) r ON p.id = r.post_id
 ORDER BY p.created_at DESC;
 
+-- 8.5 Add tags column to existing posts (if not present)
+ALTER TABLE IF EXISTS public.posts ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}';
+
+-- 8.6 Add banner column to profiles for cover images
+ALTER TABLE IF EXISTS public.profiles ADD COLUMN IF NOT EXISTS banner TEXT DEFAULT '';
+
+-- 8.6 Trending tags RPC
+CREATE OR REPLACE FUNCTION public.get_trending_tags(limit_count INTEGER DEFAULT 10)
+RETURNS TABLE(tag TEXT, count BIGINT)
+LANGUAGE SQL STABLE
+AS $$
+  SELECT unnest(tags) AS tag, COUNT(*)::BIGINT AS count
+  FROM public.posts
+  WHERE tags IS NOT NULL AND array_length(tags, 1) > 0
+  GROUP BY tag
+  ORDER BY count DESC
+  LIMIT limit_count;
+$$;
+
 -- 9. Conferences / Classes
 CREATE TABLE IF NOT EXISTS public.conferences (
   id TEXT PRIMARY KEY,
@@ -289,12 +309,12 @@ CREATE POLICY "Authenticated users can create spaces"
 DROP POLICY IF EXISTS "Hosts can update own spaces" ON public.spaces;
 CREATE POLICY "Hosts can update own spaces"
   ON public.spaces FOR UPDATE
-  USING (auth.role() = 'authenticated' AND host = auth.uid()::TEXT);
+  USING (auth.role() = 'authenticated' AND host_id = auth.uid());
 
 DROP POLICY IF EXISTS "Hosts can delete own spaces" ON public.spaces;
 CREATE POLICY "Hosts can delete own spaces"
   ON public.spaces FOR DELETE
-  USING (auth.role() = 'authenticated' AND host = auth.uid()::TEXT);
+  USING (auth.role() = 'authenticated' AND host_id = auth.uid());
 
 -- 11. Conversations / DMs
 CREATE TABLE IF NOT EXISTS public.conversations (
@@ -638,3 +658,167 @@ DROP TRIGGER IF EXISTS trg_notify_on_message ON public.messages;
 CREATE TRIGGER trg_notify_on_message
   AFTER INSERT ON public.messages
   FOR EACH ROW EXECUTE FUNCTION public.notify_on_message();
+
+-- =============================================================
+-- 9. Solved / Answer system
+-- =============================================================
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS solved_comment_id UUID REFERENCES public.comments(id) ON DELETE SET NULL;
+
+-- =============================================================
+-- 10. Flags / Moderation
+-- =============================================================
+CREATE TABLE IF NOT EXISTS public.flags (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  target_type TEXT NOT NULL CHECK (target_type IN ('post', 'comment')),
+  target_id TEXT NOT NULL,
+  reason TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'dismissed')),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  resolved_at TIMESTAMPTZ,
+  resolved_by UUID REFERENCES auth.users(id) ON DELETE SET NULL
+);
+
+ALTER TABLE public.flags ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can create flags" ON public.flags;
+CREATE POLICY "Users can create flags"
+  ON public.flags FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Mods can view all flags" ON public.flags;
+CREATE POLICY "Mods can view all flags"
+  ON public.flags FOR SELECT
+  USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'mod')));
+
+DROP POLICY IF EXISTS "Mods can update flags" ON public.flags;
+CREATE POLICY "Mods can update flags"
+  ON public.flags FOR UPDATE
+  USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin', 'mod')));
+
+-- =============================================================
+-- 11. Post revision history
+-- =============================================================
+CREATE TABLE IF NOT EXISTS public.post_versions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  post_id UUID NOT NULL REFERENCES public.posts(id) ON DELETE CASCADE,
+  title TEXT NOT NULL DEFAULT '',
+  body TEXT NOT NULL DEFAULT '',
+  edited_by UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  version INT NOT NULL DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.post_versions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anyone can view post versions" ON public.post_versions;
+CREATE POLICY "Anyone can view post versions"
+  ON public.post_versions FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "Authenticated users can insert post versions" ON public.post_versions;
+CREATE POLICY "Authenticated users can insert post versions"
+  ON public.post_versions FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');
+
+CREATE INDEX IF NOT EXISTS idx_post_versions_post ON public.post_versions(post_id, version DESC);
+
+-- =============================================================
+-- 12. Additions for new features
+-- =============================================================
+
+-- Locked column on posts (null = unlocked, number = min level to reply)
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS locked INT DEFAULT NULL;
+
+-- Suspension on profiles
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS suspended_until TIMESTAMPTZ DEFAULT NULL;
+
+-- Allow mods/admins to update any post
+DROP POLICY IF EXISTS "Authors can update own posts" ON public.posts;
+CREATE POLICY "Authors can update own posts"
+  ON public.posts FOR UPDATE
+  USING (auth.uid() = author_id OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','mod')));
+
+-- Allow mods/admins to update profiles
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+CREATE POLICY "Users can update own profile"
+  ON public.profiles FOR UPDATE
+  USING (auth.uid() = id OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','mod')));
+
+-- Allow mods/admins to delete any post
+DROP POLICY IF EXISTS "Authors can delete own posts" ON public.posts;
+CREATE POLICY "Authors can delete own posts"
+  ON public.posts FOR DELETE
+  USING (auth.uid() = author_id OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','mod')));
+
+-- Polls
+CREATE TABLE IF NOT EXISTS public.polls (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  post_id UUID NOT NULL REFERENCES public.posts(id) ON DELETE CASCADE UNIQUE,
+  question TEXT NOT NULL,
+  options JSONB NOT NULL DEFAULT '[]',
+  closes TIMESTAMPTZ DEFAULT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.polls ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Polls are public" ON public.polls;
+CREATE POLICY "Polls are public"
+  ON public.polls FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "Authenticated users can create polls" ON public.polls;
+CREATE POLICY "Authenticated users can create polls"
+  ON public.polls FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Authors can update own polls" ON public.polls;
+CREATE POLICY "Authors can update own polls"
+  ON public.polls FOR UPDATE
+  USING (auth.uid() = (SELECT author_id FROM public.posts WHERE id = post_id) OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','mod')));
+
+-- Poll votes
+CREATE TABLE IF NOT EXISTS public.poll_votes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  poll_id UUID NOT NULL REFERENCES public.polls(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  option_index INT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(poll_id, user_id)
+);
+
+ALTER TABLE public.poll_votes ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Poll votes are public" ON public.poll_votes;
+CREATE POLICY "Poll votes are public"
+  ON public.poll_votes FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "Authenticated users can vote" ON public.poll_votes;
+CREATE POLICY "Authenticated users can vote"
+  ON public.poll_votes FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- Badges
+CREATE TABLE IF NOT EXISTS public.badges (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  badge_id TEXT NOT NULL,
+  label TEXT NOT NULL,
+  icon TEXT DEFAULT 'medal',
+  awarded_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, badge_id)
+);
+
+ALTER TABLE public.badges ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Badges are public" ON public.badges;
+CREATE POLICY "Badges are public"
+  ON public.badges FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "Authenticated users can earn badges" ON public.badges;
+CREATE POLICY "Authenticated users can earn badges"
+  ON public.badges FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');

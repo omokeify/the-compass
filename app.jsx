@@ -13,13 +13,21 @@ function mapSbProfile(user, profile) {
     name: profile?.fullname || user.user_metadata?.fullname || user.email?.split('@')[0] || 'User',
     email: user.email,
     avatar: profile?.avatar || (user.email ? user.email[0].toUpperCase() : 'U'),
+    banner: profile?.banner || '',
     hue: profile?.hue || 215,
     bio: profile?.bio || '',
     loc: profile?.loc || '',
     tier: profile?.tier || 'Explorer',
     kp: profile?.kp || 0,
     role: profile?.role || null,
+    suspended_until: profile?.suspended_until || null,
   };
+}
+
+function isSuspended(user) {
+  if (!user?.suspended_until) return false;
+  const until = new Date(user.suspended_until);
+  return until > new Date();
 }
 
 function App() {
@@ -43,6 +51,33 @@ function App() {
   const [toast, setToast] = React.useState(null);
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [refreshTick, setRefreshTick] = React.useState(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  React.useEffect(() => {
+    document.body.style.overflow = mobileMenuOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileMenuOpen]);
+
+  // Register service worker for push notifications
+  React.useEffect(() => {
+    if ('serviceWorker' in navigator && 'Notification' in window) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  }, []);
+
+  window.sendBrowserNotification = (title, body, url) => {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    navigator.serviceWorker.ready.then(reg => {
+      reg.showNotification(title, { body, icon: '/favicon.ico', data: { url } });
+    }).catch(() => {});
+  };
+
+  window.requestNotifPermission = async () => {
+    if (!('Notification' in window)) return false;
+    if (Notification.permission === 'granted') return true;
+    if (Notification.permission === 'denied') return false;
+    const result = await Notification.requestPermission();
+    return result === 'granted';
+  };
 
   // Check for existing Supabase session or OAuth callback on mount
   React.useEffect(() => {
@@ -128,6 +163,7 @@ function App() {
 
   const navigate = (next, options = {}) => {
     setRoute(next);
+    setMobileMenuOpen(false);
     const nextPath = routeToPath(next);
     if (nextPath !== window.location.pathname) {
       const method = options.replace ? 'replaceState' : 'pushState';
@@ -185,8 +221,9 @@ function App() {
   }, []);
 
   let main = null;
-  if (route.view === 'home') main = <HomeFeed navigate={navigate} currentUser={currentUser} onCompose={() => setComposer({})} onSignup={() => setSignup(true)} onJoinClass={(c) => setActiveClass(c)} />;
+  if (route.view === 'home') main = <HomeFeed navigate={navigate} currentUser={currentUser} onCompose={() => setComposer({})} onSignup={() => setSignup(true)} onJoinClass={(c) => setActiveClass(c)} onJoinSpace={(s) => setActiveSpace(s)} />;
   else if (route.view === 'feed') main = <FeedView navigate={navigate} onCompose={() => setComposer({})} currentUser={currentUser} />;
+  else if (route.view === 'search') main = <SearchPage navigate={navigate} currentUser={currentUser} />;
   else if (route.view === 'talent') main = <TalentPage navigate={navigate} currentUser={currentUser} />;
   else if (route.view === 'gig') main = <GigDetailPage id={route.id} navigate={navigate} />;
   else if (route.view === 'spaces') main = <SpacesPage navigate={navigate} currentUser={currentUser} onJoinSpace={(s) => setActiveSpace(s)} />;
@@ -213,10 +250,22 @@ function App() {
       {authLoading && <div className="view" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p>Loading...</p></div>}
       {loggedIn && (
       <React.Fragment>
-      <TopBar route={route} navigate={navigate} onCompose={() => setComposer({})} currentUser={currentUser} onOpenNotifs={() => setNotifs(true)} onOpenSearch={() => setPalette(true)} onLogout={signOut} />
+      <TopBar route={route} navigate={navigate} onCompose={() => setComposer({})} currentUser={currentUser} onOpenNotifs={() => setNotifs(true)} onOpenSearch={() => setPalette(true)} onLogout={signOut} onToggleMenu={() => setMobileMenuOpen(m => !m)} />
       <div className="shell">
         <Sidebar route={route} navigate={navigate} currentUser={currentUser} />
+        {mobileMenuOpen && (
+          <div className="sidebar-overlay open" onClick={() => setMobileMenuOpen(false)}>
+            <div onClick={e => e.stopPropagation()}>
+              <Sidebar route={route} navigate={navigate} currentUser={currentUser} />
+            </div>
+          </div>
+        )}
         <main className="main-col">
+          {isSuspended(currentUser) && (
+            <div className="suspension-banner" style={{ padding: '12px 16px', background: '#fff3e0', borderBottom: '1px solid #ffcc80', color: '#e65100', fontSize: 14, textAlign: 'center' }}>
+              Your account is suspended until {new Date(currentUser.suspended_until).toLocaleDateString()}. You can read but cannot post, comment, or interact.
+            </div>
+          )}
           {main}
         </main>
       </div>

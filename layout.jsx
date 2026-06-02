@@ -184,7 +184,7 @@ const ProfileDropdown = ({ currentUser, onNavigate, onClose, onLogout }) => {
 };
 
 // ---------- TopBar ----------
-const TopBar = ({ route, navigate, onCompose, currentUser, onOpenNotifs, onOpenSearch, onLogout }) => {
+const TopBar = ({ route, navigate, onCompose, currentUser, onOpenNotifs, onOpenSearch, onLogout, onToggleMenu }) => {
   const [notifCount, setNotifCount] = React.useState(0);
   React.useEffect(() => {
     setNotifCount(window.__notifUnreadCount || 0);
@@ -248,6 +248,9 @@ const TopBar = ({ route, navigate, onCompose, currentUser, onOpenNotifs, onOpenS
   return (
     <header className={`topbar ${scrolled ? 'scrolled' : ''}`}>
       <div className="topbar-left">
+        <button className="mobile-hamburger" onClick={onToggleMenu} aria-label="Toggle menu">
+          <Icon name="menu" size={18} />
+        </button>
         <div className="brand" onClick={() => navigate({ view: 'home' })}>
           <CompassLogo size={28} />
           <span className="brand-name">Compass</span>
