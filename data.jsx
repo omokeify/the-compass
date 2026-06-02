@@ -900,7 +900,7 @@ const spaceService = {
     }
     const space = SPACES.find(s => s.id === id);
     if (!space) return null;
-      space.listeners = (space.listeners || 0) + by;
+    space.listeners = (space.listeners || 0) + by;
     this._persist();
     return space;
   },
@@ -967,16 +967,8 @@ if (!window.__compass_poller_running) {
         spaceService.list(),
         conferenceService.list(),
       ]);
-      if (Array.isArray(spaces)) {
-        SPACES.length = 0;
-        SPACES.push(...spaces);
-        window.dispatchEvent(new Event('compass_spaces_refresh'));
-      }
-      if (Array.isArray(conferences)) {
-        CONFERENCES.length = 0;
-        CONFERENCES.push(...conferences);
-        window.dispatchEvent(new Event('compass_conferences_refresh'));
-      }
+      if (Array.isArray(spaces)) { SPACES.length = 0; SPACES.push(...spaces); window.dispatchEvent(new Event('compass_spaces_refresh')); }
+      if (Array.isArray(conferences)) { CONFERENCES.length = 0; CONFERENCES.push(...conferences); window.dispatchEvent(new Event('compass_conferences_refresh')); }
     } catch {}
   }, COMPASS_LIVE_TICK_MS);
 }

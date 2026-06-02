@@ -280,15 +280,17 @@ const supabaseService = {
   },
 
   async createConference(cls) {
+    const session = getSession();
     const res = await fetch(`${SUPABASE_URL}/rest/v1/conferences`, {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({
         id: cls.id,
+        host_id: session?.user?.id || null,
+        host: cls.host,
         title: cls.title,
         description: cls.desc || '',
         cat: cls.cat || 'training',
-        host: cls.host,
         cohosts: JSON.stringify(cls.cohosts || []),
         stage: JSON.stringify(cls.stage || []),
         status: cls.status || 'scheduled',
@@ -359,14 +361,16 @@ const supabaseService = {
   },
 
   async createSpace(space) {
+    const session = getSession();
     const res = await fetch(`${SUPABASE_URL}/rest/v1/spaces`, {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({
         id: space.id,
+        host_id: session?.user?.id || null,
+        host: space.host,
         title: space.title,
         description: space.topic || space.desc || '',
-        host: space.host,
         cohosts: JSON.stringify(Array.isArray(space.cohosts) ? space.cohosts : []),
         speakers: JSON.stringify(
           typeof space.speakers === 'number'

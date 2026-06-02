@@ -185,10 +185,11 @@ ORDER BY p.created_at DESC;
 -- 9. Conferences / Classes
 CREATE TABLE IF NOT EXISTS public.conferences (
   id TEXT PRIMARY KEY,
+  host TEXT NOT NULL,
+  host_id UUID NOT NULL REFERENCES auth.users(id),
   title TEXT NOT NULL,
   description TEXT DEFAULT '',
   cat TEXT DEFAULT 'training',
-  host TEXT NOT NULL,
   cohosts JSONB DEFAULT '[]'::jsonb,
   stage JSONB DEFAULT '[]'::jsonb,
   status TEXT DEFAULT 'scheduled',
@@ -210,6 +211,8 @@ CREATE TABLE IF NOT EXISTS public.conferences (
 );
 
 ALTER TABLE public.conferences ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE public.conferences ADD COLUMN IF NOT EXISTS host_id UUID;
 
 DROP POLICY IF EXISTS "Conferences are public" ON public.conferences;
 CREATE POLICY "Conferences are public"
@@ -251,8 +254,25 @@ CREATE TABLE IF NOT EXISTS public.spaces (
 
 ALTER TABLE public.spaces ENABLE ROW LEVEL SECURITY;
 
+ALTER TABLE public.spaces ADD COLUMN IF NOT EXISTS host_id UUID;
 ALTER TABLE public.spaces ADD COLUMN IF NOT EXISTS reminder_handles JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE public.spaces ADD COLUMN IF NOT EXISTS reminders INTEGER DEFAULT 0;
+
+CREATE OR REPLACE FUNCTION public.set_host_id()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.host_id IS NULL THEN
+    NEW.host_id := auth.uid();
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS set_host_id_spaces ON public.spaces;
+CREATE TRIGGER set_host_id_spaces BEFORE INSERT ON public.spaces FOR EACH ROW EXECUTE FUNCTION public.set_host_id();
+
+DROP TRIGGER IF EXISTS set_host_id_conferences ON public.conferences;
+CREATE TRIGGER set_host_id_conferences BEFORE INSERT ON public.conferences FOR EACH ROW EXECUTE FUNCTION public.set_host_id();
 
 DROP POLICY IF EXISTS "Spaces are public" ON public.spaces;
 CREATE POLICY "Spaces are public"
