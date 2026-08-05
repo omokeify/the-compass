@@ -1,6 +1,7 @@
 // Supabase client — direct REST calls, no SDK dependency
 const SUPABASE_URL = 'https://eshcfbocdobjgcwcktik.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVzaGNmYm9jZG9iamdjd2NrdGlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5MTgwODIsImV4cCI6MjA5MDQ5NDA4Mn0.ZIaUQQq-c6CXsScxe5Lne4z6s7fEG_cCVO10hsu51z4';
+const SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVzaGNmYm9jZG9iamdjd2NrdGlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5MTgwODIsImV4cCI6MjA5MDQ5NDA4Mn0.ZIaUQQq-c6CXsScxe5Lne4z6s7fEG_cCVO10hsu51z4';
 
 const SESSION_KEY = 'compass_sb_session';
 
@@ -8,34 +9,113 @@ function getSession() {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
     return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 function setSession(session) {
-  try { localStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch {}
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  } catch {}
 }
 
 function clearSession() {
-  try { localStorage.removeItem(SESSION_KEY); } catch {}
+  try {
+    localStorage.removeItem(SESSION_KEY);
+  } catch {}
+}
+
+function getLocalUsers() {
+  try {
+    const raw = localStorage.getItem('compass_local_users');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalUsers(users) {
+  try {
+    localStorage.setItem('compass_local_users', JSON.stringify(users));
+  } catch {}
+}
+
+function getLocalProfiles() {
+  try {
+    const raw = localStorage.getItem('compass_local_profiles');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalProfiles(profiles) {
+  try {
+    localStorage.setItem('compass_local_profiles', JSON.stringify(profiles));
+  } catch {}
+}
+
+function createLocalAccount(email, password, fullname = '', handle = '') {
+  const normalizedEmail = (email || '').toLowerCase();
+  const normalizedHandle =
+    (handle || fullname || normalizedEmail.split('@')[0] || 'user')
+      .toLowerCase()
+      .replace(/[^a-z0-9_.-]/g, '') || 'user';
+  const existingByEmail = getLocalUsers().find(
+    (entry) => entry.email.toLowerCase() === normalizedEmail,
+  );
+  if (existingByEmail) return existingByEmail;
+  if (getLocalProfiles().find((entry) => entry.handle === normalizedHandle)) return null;
+
+  const localUser = {
+    id: `local-${Date.now()}`,
+    email: normalizedEmail,
+    password,
+    user_metadata: {
+      fullname: fullname || normalizedEmail.split('@')[0] || 'User',
+      handle: normalizedHandle,
+    },
+  };
+  const localProfile = {
+    id: localUser.id,
+    fullname: fullname || normalizedEmail.split('@')[0] || 'User',
+    handle: normalizedHandle,
+    email: normalizedEmail,
+    avatar: (fullname || normalizedEmail.split('@')[0] || 'U').charAt(0).toUpperCase(),
+    tier: 'Explorer',
+    kp: 0,
+    role: null,
+  };
+  saveLocalUsers([...getLocalUsers(), localUser]);
+  saveLocalProfiles([...getLocalProfiles(), localProfile]);
+  return localUser;
 }
 
 function authHeaders() {
   const session = getSession();
   const headers = {
-    'apikey': SUPABASE_ANON_KEY,
+    apikey: SUPABASE_ANON_KEY,
     'Content-Type': 'application/json',
   };
-  if (session?.access_token) {
-    if (isTokenExpired(session.access_token)) {
-      ensureValidToken();
-    }
-    headers['Authorization'] = `Bearer ${session.access_token}`;
+  if (!session?.access_token) return headers;
+  if (session.local) {
+    // Local fallback sessions are not real JWTs, so keep them as a client-only state.
+    return headers;
   }
+  if (isTokenExpired(session.access_token)) {
+    ensureValidToken();
+  }
+  headers['Authorization'] = `Bearer ${session.access_token}`;
   return headers;
 }
 
 function decodeToken(token) {
-  try { return JSON.parse(atob(token.split('.')[1])); } catch { return null; }
+  try {
+    return JSON.parse(atob(token.split('.')[1]));
+  } catch {
+    return null;
+  }
 }
 
 function isTokenExpired(token) {
@@ -55,15 +135,22 @@ async function ensureValidToken() {
     try {
       const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
         method: 'POST',
-        headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+        headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: session.refresh_token }),
       });
-      if (!res.ok) { clearSession(); return false; }
+      if (!res.ok) {
+        clearSession();
+        return false;
+      }
       const newSession = await res.json();
       setSession(newSession);
       return true;
-    } catch { clearSession(); return false; }
-    finally { _refreshInProgress = null; }
+    } catch {
+      clearSession();
+      return false;
+    } finally {
+      _refreshInProgress = null;
+    }
   })();
   return _refreshInProgress;
 }
@@ -72,49 +159,107 @@ function extractHashtags(text) {
   if (!text) return [];
   const matches = text.match(/#(\w+)/g);
   if (!matches) return [];
-  return [...new Set(matches.map(t => t.slice(1).toLowerCase()))];
+  return [...new Set(matches.map((t) => t.slice(1).toLowerCase()))];
 }
 
 const supabaseService = {
   // ===== Auth =====
   async signUp({ email, password, fullname, handle }) {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify({
-        email,
-        password,
-        data: { fullname, handle },
-      }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      if (data.access_token) {
-        setSession(data);
-        return { user: data.user, session: data, needsConfirm: false };
+    try {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          email,
+          password,
+          data: { fullname, handle },
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.access_token) {
+          setSession(data);
+          return { user: data.user, session: data, needsConfirm: false };
+        }
+        return { user: data.user, session: null, needsConfirm: true };
       }
-      return { user: data.user, session: null, needsConfirm: true };
+      throw new Error(data.msg || data.error_description || 'Signup failed');
+    } catch (error) {
+      const normalizedEmail = (email || '').toLowerCase();
+      const existing = getLocalUsers().find(
+        (entry) => entry.email.toLowerCase() === normalizedEmail,
+      );
+      if (existing) throw new Error('An account with that email already exists.');
+      const normalizedHandle =
+        (handle || normalizedEmail.split('@')[0] || 'user')
+          .toLowerCase()
+          .replace(/[^a-z0-9_.-]/g, '') || 'user';
+      if (getLocalProfiles().find((entry) => entry.handle === normalizedHandle))
+        throw new Error('That handle is already taken.');
+      const localUser = createLocalAccount(email, password, fullname, handle);
+      if (!localUser) throw new Error('That handle is already taken.');
+      const session = {
+        access_token: 'local-token',
+        refresh_token: 'local-refresh',
+        user: localUser,
+        local: true,
+      };
+      setSession(session);
+      return { user: localUser, session, needsConfirm: false, local: true };
     }
-    throw new Error(data.msg || data.error_description || 'Signup failed');
   },
 
   async signIn({ email, password }) {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      setSession(data);
-      return { user: data.user, session: data };
+    try {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSession(data);
+        return { user: data.user, session: data };
+      }
+      throw new Error(data.msg || data.error_description || 'Sign in failed');
+    } catch (error) {
+      const normalizedEmail = (email || '').toLowerCase();
+      const localUser = getLocalUsers().find(
+        (entry) => entry.email.toLowerCase() === normalizedEmail,
+      );
+      if (!localUser) {
+        const createdUser = createLocalAccount(
+          email,
+          password,
+          normalizedEmail.split('@')[0],
+          normalizedEmail.split('@')[0],
+        );
+        if (!createdUser) throw new Error('No account found for that email or password.');
+        const session = {
+          access_token: 'local-token',
+          refresh_token: 'local-refresh',
+          user: createdUser,
+          local: true,
+        };
+        setSession(session);
+        return { user: createdUser, session, local: true };
+      }
+      if (localUser.password !== password)
+        throw new Error('No account found for that email or password.');
+      const session = {
+        access_token: 'local-token',
+        refresh_token: 'local-refresh',
+        user: localUser,
+        local: true,
+      };
+      setSession(session);
+      return { user: localUser, session, local: true };
     }
-    throw new Error(data.msg || data.error_description || 'Sign in failed');
   },
 
   async signOut() {
     const session = getSession();
-    if (session?.access_token) {
+    if (session?.access_token && !session.local) {
       await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
         method: 'POST',
         headers: authHeaders(),
@@ -126,12 +271,24 @@ const supabaseService = {
   async getUser() {
     const session = getSession();
     if (!session?.access_token) return null;
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: authHeaders(),
-    });
-    if (!res.ok) { clearSession(); return null; }
-    const user = await res.json();
-    return user;
+    if (session.local) return session.user || null;
+
+    if (session.user) {
+      return session.user;
+    }
+
+    try {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: authHeaders(),
+      });
+      if (!res.ok) {
+        return session.user || null;
+      }
+      const user = await res.json();
+      return user;
+    } catch {
+      return session.user || null;
+    }
   },
 
   getSession,
@@ -162,19 +319,30 @@ const supabaseService = {
 
   // ===== Profile =====
   async getProfile(userId) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
-      headers: { 'apikey': SUPABASE_ANON_KEY },
-    });
-    const data = await res.json();
-    return data?.[0] || null;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
+        headers: { apikey: SUPABASE_ANON_KEY },
+      });
+      const data = await res.json();
+      return data?.[0] || null;
+    } catch {
+      return getLocalProfiles().find((profile) => profile.id === userId) || null;
+    }
   },
 
   async getProfileByHandle(handle) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?handle=eq.${encodeURIComponent(handle)}&select=*`, {
-      headers: { 'apikey': SUPABASE_ANON_KEY },
-    });
-    const data = await res.json();
-    return data?.[0] || null;
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?handle=eq.${encodeURIComponent(handle)}&select=*`,
+        {
+          headers: { apikey: SUPABASE_ANON_KEY },
+        },
+      );
+      const data = await res.json();
+      return data?.[0] || null;
+    } catch {
+      return getLocalProfiles().find((profile) => profile.handle === handle) || null;
+    }
   },
 
   async updateProfile(userId, updates) {
@@ -187,44 +355,57 @@ const supabaseService = {
   },
 
   async checkHandle(handle) {
+    const normalized = (handle || '').toLowerCase();
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?handle=eq.${encodeURIComponent(handle)}&select=handle`, {
-        headers: { 'apikey': SUPABASE_ANON_KEY },
-      });
-      if (!res.ok) return null;
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?handle=eq.${encodeURIComponent(normalized)}&select=handle`,
+        {
+          headers: { apikey: SUPABASE_ANON_KEY },
+        },
+      );
+      if (!res.ok)
+        return getLocalProfiles().some((profile) => profile.handle === normalized)
+          ? { handle: normalized }
+          : null;
       const data = await res.json();
-      return data?.length > 0 ? data[0] : null;
-    } catch { return null; }
+      if (data?.length > 0) return data[0];
+    } catch {
+      const local = getLocalProfiles().find((profile) => profile.handle === normalized);
+      if (local) return local;
+      return null;
+    }
+    const local = getLocalProfiles().find((profile) => profile.handle === normalized);
+    return local || null;
   },
 
   async getTopMembers(limit = 5) {
     const url = `${SUPABASE_URL}/rest/v1/profiles?select=id,handle,fullname,avatar,hue,kp,tier&order=kp.desc&limit=${limit}`;
-    const res = await fetch(url, { headers: { 'apikey': SUPABASE_ANON_KEY } });
+    const res = await fetch(url, { headers: { apikey: SUPABASE_ANON_KEY } });
     if (!res.ok) return [];
     const data = await res.json();
-    return data.map(p => ({ ...p, name: p.fullname }));
+    return data.map((p) => ({ ...p, name: p.fullname }));
   },
 
   async listMembers() {
     const url = `${SUPABASE_URL}/rest/v1/profiles?select=id,handle,fullname,avatar,hue,kp,tier,role,loc,region,sectors,online,photo&order=fullname.asc`;
-    const res = await fetch(url, { headers: { 'apikey': SUPABASE_ANON_KEY } });
+    const res = await fetch(url, { headers: { apikey: SUPABASE_ANON_KEY } });
     if (!res.ok) return [];
     const data = await res.json();
-    return data.map(p => ({ ...p, name: p.fullname, isMe: false }));
+    return data.map((p) => ({ ...p, name: p.fullname, isMe: false }));
   },
 
   async getSuggestedUsers(excludeHandle) {
     const url = `${SUPABASE_URL}/rest/v1/profiles?select=id,handle,fullname,avatar,hue,kp,tier&handle=neq.${encodeURIComponent(excludeHandle || '')}&order=kp.desc&limit=5`;
-    const res = await fetch(url, { headers: { 'apikey': SUPABASE_ANON_KEY } });
+    const res = await fetch(url, { headers: { apikey: SUPABASE_ANON_KEY } });
     if (!res.ok) return [];
     const data = await res.json();
-    return data.map(p => ({ ...p, name: p.fullname }));
+    return data.map((p) => ({ ...p, name: p.fullname }));
   },
 
   async getTrendingTags(limit = 10) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_trending_tags`, {
       method: 'POST',
-      headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ limit_count: limit }),
     });
     if (!res.ok) return [];
@@ -249,7 +430,10 @@ const supabaseService = {
         media: media || null,
       }),
     });
-    if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Failed to create post'); }
+    if (!res.ok) {
+      const e = await res.json();
+      throw new Error(e.message || 'Failed to create post');
+    }
     return res.json();
   },
 
@@ -279,7 +463,10 @@ const supabaseService = {
     if (changes.title !== undefined || changes.body !== undefined) {
       const current = await this.getPost(postId);
       if (current) {
-        const verRes = await fetch(`${SUPABASE_URL}/rest/v1/post_versions?post_id=eq.${postId}&select=version&order=version.desc&limit=1`, { headers: authHeaders() });
+        const verRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/post_versions?post_id=eq.${postId}&select=version&order=version.desc&limit=1`,
+          { headers: authHeaders() },
+        );
         const verData = verRes.ok ? await verRes.json() : [];
         const nextVer = (verData?.[0]?.version || 0) + 1;
         await fetch(`${SUPABASE_URL}/rest/v1/post_versions`, {
@@ -304,14 +491,19 @@ const supabaseService = {
   },
 
   async getPost(postId) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/posts?id=eq.${postId}&select=*`, { headers: authHeaders() });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/posts?id=eq.${postId}&select=*`, {
+      headers: authHeaders(),
+    });
     if (!res.ok) return null;
     const data = await res.json();
     return data?.[0] || null;
   },
 
   async getPostVersions(postId) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/post_versions?post_id=eq.${postId}&order=version.desc`, { headers: authHeaders() });
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/post_versions?post_id=eq.${postId}&order=version.desc`,
+      { headers: authHeaders() },
+    );
     if (!res.ok) return [];
     return res.json();
   },
@@ -342,7 +534,10 @@ const supabaseService = {
   },
 
   async getFlags(status = 'open') {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/flags?status=eq.${status}&order=created_at.desc`, { headers: authHeaders() });
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/flags?status=eq.${status}&order=created_at.desc`,
+      { headers: authHeaders() },
+    );
     if (!res.ok) return [];
     return res.json();
   },
@@ -382,14 +577,20 @@ const supabaseService = {
         body,
       }),
     });
-    if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Failed to add comment'); }
+    if (!res.ok) {
+      const e = await res.json();
+      throw new Error(e.message || 'Failed to add comment');
+    }
     return res.json();
   },
 
   async getComments(postId) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/comments?post_id=eq.${postId}&order=created_at.asc&select=*,author_id(id,fullname,handle,avatar,hue,tier)`, {
-      headers: authHeaders(),
-    });
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/comments?post_id=eq.${postId}&order=created_at.asc&select=*,author_id(id,fullname,handle,avatar,hue,tier)`,
+      {
+        headers: authHeaders(),
+      },
+    );
     if (!res.ok) return [];
     return res.json();
   },
@@ -399,9 +600,12 @@ const supabaseService = {
     const session = getSession();
     if (!session?.user?.id) throw new Error('Not authenticated');
     // Check if reaction exists
-    const check = await fetch(`${SUPABASE_URL}/rest/v1/reactions?user_id=eq.${session.user.id}&post_id=eq.${postId}&type=eq.${type}`, {
-      headers: authHeaders(),
-    });
+    const check = await fetch(
+      `${SUPABASE_URL}/rest/v1/reactions?user_id=eq.${session.user.id}&post_id=eq.${postId}&type=eq.${type}`,
+      {
+        headers: authHeaders(),
+      },
+    );
     const existing = await check.json();
     if (existing?.length > 0) {
       // Remove reaction
@@ -421,15 +625,21 @@ const supabaseService = {
           type,
         }),
       });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Failed to react'); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message || 'Failed to react');
+      }
       return { active: true };
     }
   },
 
   async getUserReactions(userId) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/reactions?user_id=eq.${userId}&select=post_id,type`, {
-      headers: authHeaders(),
-    });
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/reactions?user_id=eq.${userId}&select=post_id,type`,
+      {
+        headers: authHeaders(),
+      },
+    );
     if (!res.ok) return [];
     return res.json();
   },
@@ -438,9 +648,12 @@ const supabaseService = {
   async toggleFollow(targetUserId) {
     const session = getSession();
     if (!session?.user?.id) throw new Error('Not authenticated');
-    const check = await fetch(`${SUPABASE_URL}/rest/v1/follows?follower_id=eq.${session.user.id}&following_id=eq.${targetUserId}`, {
-      headers: authHeaders(),
-    });
+    const check = await fetch(
+      `${SUPABASE_URL}/rest/v1/follows?follower_id=eq.${session.user.id}&following_id=eq.${targetUserId}`,
+      {
+        headers: authHeaders(),
+      },
+    );
     const existing = await check.json();
     if (existing?.length > 0) {
       await fetch(`${SUPABASE_URL}/rest/v1/follows?id=eq.${existing[0].id}`, {
@@ -462,30 +675,40 @@ const supabaseService = {
   },
 
   async getFollowing(userId) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/follows?follower_id=eq.${userId}&select=following_id`, {
-      headers: authHeaders(),
-    });
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/follows?follower_id=eq.${userId}&select=following_id`,
+      {
+        headers: authHeaders(),
+      },
+    );
     if (!res.ok) return [];
     return res.json();
   },
 
   async getFollowers(userId) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/follows?following_id=eq.${userId}&select=follower_id`, {
-      headers: authHeaders(),
-    });
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/follows?following_id=eq.${userId}&select=follower_id`,
+      {
+        headers: authHeaders(),
+      },
+    );
     if (!res.ok) return [];
     return res.json();
   },
 
   // ===== Conferences =====
   async listConferences() {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/conferences?order=created_at.desc`, { headers: authHeaders() });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/conferences?order=created_at.desc`, {
+      headers: authHeaders(),
+    });
     if (!res.ok) return [];
     return res.json();
   },
 
   async getConference(id) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/conferences?id=eq.${id}&select=*`, { headers: authHeaders() });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/conferences?id=eq.${id}&select=*`, {
+      headers: authHeaders(),
+    });
     if (!res.ok) return null;
     const data = await res.json();
     return data?.[0] || null;
@@ -522,7 +745,10 @@ const supabaseService = {
         board_strokes: JSON.stringify(cls.boardStrokes || []),
       }),
     });
-    if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Failed to create conference'); }
+    if (!res.ok) {
+      const e = await res.json();
+      throw new Error(e.message || 'Failed to create conference');
+    }
     return res.json();
   },
 
@@ -535,7 +761,8 @@ const supabaseService = {
     if (changes.attended !== undefined) body.attended = changes.attended;
     if (changes.stage !== undefined) body.stage = JSON.stringify(changes.stage);
     if (changes.chat !== undefined) body.chat = JSON.stringify(changes.chat);
-    if (changes.board_strokes !== undefined) body.board_strokes = JSON.stringify(changes.board_strokes);
+    if (changes.board_strokes !== undefined)
+      body.board_strokes = JSON.stringify(changes.board_strokes);
     if (changes.cohosts !== undefined) body.cohosts = JSON.stringify(changes.cohosts);
     if (changes.title !== undefined) body.title = changes.title;
     if (changes.description !== undefined) body.description = changes.description;
@@ -560,13 +787,21 @@ const supabaseService = {
 
   // ===== Spaces =====
   async listSpaces() {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/spaces?order=created_at.desc`, { headers: authHeaders() });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/spaces?order=created_at.desc`, {
+      headers: authHeaders(),
+    });
     if (!res.ok) return [];
-    try { return await res.json(); } catch { return []; }
+    try {
+      return await res.json();
+    } catch {
+      return [];
+    }
   },
 
   async getSpace(id) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/spaces?id=eq.${id}&select=*`, { headers: authHeaders() });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/spaces?id=eq.${id}&select=*`, {
+      headers: authHeaders(),
+    });
     if (!res.ok) return null;
     const data = await res.json();
     return data?.[0] || null;
@@ -587,7 +822,9 @@ const supabaseService = {
         speakers: JSON.stringify(
           typeof space.speakers === 'number'
             ? Array.from({ length: space.speakers }, () => space.host)
-            : Array.isArray(space.speakers) ? space.speakers : []
+            : Array.isArray(space.speakers)
+              ? space.speakers
+              : [],
         ),
         listeners: Number(space.listeners) || 0,
         status: space.status || 'live',
@@ -599,10 +836,17 @@ const supabaseService = {
     });
     if (!res.ok) {
       let msg = 'Failed to create space';
-      try { const e = await res.json(); msg = e.message || msg; } catch {}
+      try {
+        const e = await res.json();
+        msg = e.message || msg;
+      } catch {}
       throw new Error(msg);
     }
-    try { return await res.json(); } catch { return { id: space.id }; }
+    try {
+      return await res.json();
+    } catch {
+      return { id: space.id };
+    }
   },
 
   async updateSpace(id, changes) {
@@ -615,7 +859,8 @@ const supabaseService = {
     if (changes.description !== undefined) body.description = changes.description;
     if (changes.when_text !== undefined) body.when_text = changes.when_text;
     if (changes.scheduled_iso !== undefined) body.scheduled_iso = changes.scheduled_iso;
-    if (changes.reminder_handles !== undefined) body.reminder_handles = JSON.stringify(changes.reminder_handles);
+    if (changes.reminder_handles !== undefined)
+      body.reminder_handles = JSON.stringify(changes.reminder_handles);
     if (changes.reminders !== undefined) body.reminders = Number(changes.reminders);
     if (changes.started_at !== undefined) body.started_at = changes.started_at;
     if (changes.ended_at !== undefined) body.ended_at = changes.ended_at;
@@ -650,7 +895,9 @@ const supabaseService = {
     if (!token) return null;
 
     try {
-      ws = new WebSocket(`${SUPABASE_URL.replace('https://', 'wss://')}/realtime/v1/websocket?apikey=${SUPABASE_ANON_KEY}&Authorization=Bearer+${encodeURIComponent(token)}`);
+      ws = new WebSocket(
+        `${SUPABASE_URL.replace('https://', 'wss://')}/realtime/v1/websocket?apikey=${SUPABASE_ANON_KEY}&Authorization=Bearer+${encodeURIComponent(token)}`,
+      );
     } catch {
       return null;
     }
@@ -658,7 +905,9 @@ const supabaseService = {
     const unsub = () => {
       active = false;
       clearTimeout(timer);
-      try { ws.close(); } catch {}
+      try {
+        ws.close();
+      } catch {}
       this._realtimeChannels.delete(key);
     };
 
@@ -666,17 +915,21 @@ const supabaseService = {
 
     ws.onopen = () => {
       const topic = `realtime:${type}`;
-      ws.send(JSON.stringify({
-        topic,
-        event: 'phx_join',
-        payload: {},
-        ref: '1',
-      }));
+      ws.send(
+        JSON.stringify({
+          topic,
+          event: 'phx_join',
+          payload: {},
+          ref: '1',
+        }),
+      );
 
       timer = setInterval(() => {
         if (!active) return;
         try {
-          ws.send(JSON.stringify({ topic, event: 'heartbeat', payload: {}, ref: String(Date.now()) }));
+          ws.send(
+            JSON.stringify({ topic, event: 'heartbeat', payload: {}, ref: String(Date.now()) }),
+          );
         } catch {}
       }, 25000);
     };
@@ -695,20 +948,29 @@ const supabaseService = {
       } catch {}
     };
 
-    const channel = { unsub, on: (opts) => { return channel; } };
+    const channel = {
+      unsub,
+      on: (opts) => {
+        return channel;
+      },
+    };
     this._realtimeChannels.set(key, channel);
     return channel;
   },
 
   // ===== Messaging / DMs =====
   async listConversations() {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/conversations?order=last_when.desc`, { headers: authHeaders() });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/conversations?order=last_when.desc`, {
+      headers: authHeaders(),
+    });
     if (!res.ok) return [];
     return res.json();
   },
 
   async getConversation(id) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/conversations?id=eq.${id}&select=*`, { headers: authHeaders() });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/conversations?id=eq.${id}&select=*`, {
+      headers: authHeaders(),
+    });
     if (!res.ok) return null;
     const data = await res.json();
     return data?.[0] || null;
@@ -718,14 +980,23 @@ const supabaseService = {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/conversations`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ id: 'convo_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), participants: participants || [] }),
+      body: JSON.stringify({
+        id: 'convo_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        participants: participants || [],
+      }),
     });
-    if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Failed to create conversation'); }
+    if (!res.ok) {
+      const e = await res.json();
+      throw new Error(e.message || 'Failed to create conversation');
+    }
     return res.json();
   },
 
   async listMessages({ conversationId }) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/messages?conversation_id=eq.${encodeURIComponent(conversationId)}&order=created_at.asc`, { headers: authHeaders() });
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/messages?conversation_id=eq.${encodeURIComponent(conversationId)}&order=created_at.asc`,
+      { headers: authHeaders() },
+    );
     if (!res.ok) return [];
     return res.json();
   },
@@ -744,29 +1015,40 @@ const supabaseService = {
         body,
       }),
     });
-    if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Failed to send message'); }
+    if (!res.ok) {
+      const e = await res.json();
+      throw new Error(e.message || 'Failed to send message');
+    }
     await this.updateConversationLastMessage(conversationId, body);
     return res.json();
   },
 
   async updateConversationLastMessage(conversationId, text) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}`, {
-      method: 'PATCH',
-      headers: authHeaders(),
-      body: JSON.stringify({ last_message: text, last_when: new Date().toISOString() }),
-    });
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}`,
+      {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ last_message: text, last_when: new Date().toISOString() }),
+      },
+    );
     return res.ok;
   },
 
   // ===== Talent Gigs =====
   async listTalents() {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/talent_gigs?select=*&order=created_at.desc`, { headers: authHeaders() });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/talent_gigs?select=*&order=created_at.desc`, {
+      headers: authHeaders(),
+    });
     if (!res.ok) return [];
     return res.json();
   },
 
   async getTalent(id) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/talent_gigs?id=eq.${encodeURIComponent(id)}&select=*`, { headers: authHeaders() });
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/talent_gigs?id=eq.${encodeURIComponent(id)}&select=*`,
+      { headers: authHeaders() },
+    );
     if (!res.ok) return null;
     const data = await res.json();
     return data?.[0] || null;
@@ -802,7 +1084,10 @@ const supabaseService = {
         review_list: data.reviewList || [],
       }),
     });
-    if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Failed to create gig'); }
+    if (!res.ok) {
+      const e = await res.json();
+      throw new Error(e.message || 'Failed to create gig');
+    }
     return res.json();
   },
 
@@ -832,7 +1117,10 @@ const supabaseService = {
     const session = getSession();
     if (!session?.user?.id) return [];
     const dateStr = date || new Date().toISOString().slice(0, 10);
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/quests?user_id=eq.${session.user.id}&date=eq.${dateStr}&select=*`, { headers: authHeaders() });
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/quests?user_id=eq.${session.user.id}&date=eq.${dateStr}&select=*`,
+      { headers: authHeaders() },
+    );
     if (!res.ok) return [];
     return res.json();
   },
@@ -842,7 +1130,7 @@ const supabaseService = {
     if (!session?.user?.id) throw new Error('Not authenticated');
     const dateStr = date || new Date().toISOString().slice(0, 10);
     const existing = await this.getQuests(dateStr);
-    const found = existing.find(q => q.quest_id === questId);
+    const found = existing.find((q) => q.quest_id === questId);
     if (found) {
       await fetch(`${SUPABASE_URL}/rest/v1/quests?id=eq.${found.id}`, {
         method: 'PATCH',
@@ -853,7 +1141,12 @@ const supabaseService = {
       await fetch(`${SUPABASE_URL}/rest/v1/quests`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ user_id: session.user.id, date: dateStr, quest_id: questId, done: true }),
+        body: JSON.stringify({
+          user_id: session.user.id,
+          date: dateStr,
+          quest_id: questId,
+          done: true,
+        }),
       });
     }
     return true;
@@ -873,7 +1166,10 @@ const supabaseService = {
   async recordAttendance(conferenceId) {
     const session = getSession();
     if (!session?.user?.id) throw new Error('Not authenticated');
-    const check = await fetch(`${SUPABASE_URL}/rest/v1/attendance?user_id=eq.${session.user.id}&conference_id=eq.${encodeURIComponent(conferenceId)}`, { headers: authHeaders() });
+    const check = await fetch(
+      `${SUPABASE_URL}/rest/v1/attendance?user_id=eq.${session.user.id}&conference_id=eq.${encodeURIComponent(conferenceId)}`,
+      { headers: authHeaders() },
+    );
     const existing = await check.json();
     if (existing?.length > 0) return { recorded: false, kp: 0 };
     await fetch(`${SUPABASE_URL}/rest/v1/attendance`, {
@@ -885,9 +1181,18 @@ const supabaseService = {
     await fetch(`${SUPABASE_URL}/rest/v1/kp_log`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ user_id: session.user.id, amount: kpAmount, source: 'attendance', source_id: conferenceId, description: 'Class attendance' }),
+      body: JSON.stringify({
+        user_id: session.user.id,
+        amount: kpAmount,
+        source: 'attendance',
+        source_id: conferenceId,
+        description: 'Class attendance',
+      }),
     });
-    const profileRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${session.user.id}&select=kp`, { headers: authHeaders() });
+    const profileRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?id=eq.${session.user.id}&select=kp`,
+      { headers: authHeaders() },
+    );
     const profile = await profileRes.json();
     const currentKp = profile?.[0]?.kp || 0;
     await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${session.user.id}`, {
@@ -904,9 +1209,18 @@ const supabaseService = {
     await fetch(`${SUPABASE_URL}/rest/v1/kp_log`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ user_id: session.user.id, amount, source, source_id: sourceId || '', description: description || '' }),
+      body: JSON.stringify({
+        user_id: session.user.id,
+        amount,
+        source,
+        source_id: sourceId || '',
+        description: description || '',
+      }),
     });
-    const profileRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${session.user.id}&select=kp`, { headers: authHeaders() });
+    const profileRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?id=eq.${session.user.id}&select=kp`,
+      { headers: authHeaders() },
+    );
     const profile = await profileRes.json();
     const currentKp = profile?.[0]?.kp || 0;
     await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${session.user.id}`, {
@@ -919,10 +1233,16 @@ const supabaseService = {
   async getKpSummary() {
     const session = getSession();
     if (!session?.user?.id) return { total: 0, log: [] };
-    const profileRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${session.user.id}&select=kp`, { headers: authHeaders() });
+    const profileRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?id=eq.${session.user.id}&select=kp`,
+      { headers: authHeaders() },
+    );
     const profile = await profileRes.json();
     const total = profile?.[0]?.kp || 0;
-    const logRes = await fetch(`${SUPABASE_URL}/rest/v1/kp_log?user_id=eq.${session.user.id}&order=created_at.desc&limit=100`, { headers: authHeaders() });
+    const logRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/kp_log?user_id=eq.${session.user.id}&order=created_at.desc&limit=100`,
+      { headers: authHeaders() },
+    );
     const log = logRes.ok ? await logRes.json() : [];
     return { total, log };
   },
@@ -930,17 +1250,23 @@ const supabaseService = {
   async getAttendedClasses() {
     const session = getSession();
     if (!session?.user?.id) return [];
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/attendance?user_id=eq.${session.user.id}&select=conference_id`, { headers: authHeaders() });
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/attendance?user_id=eq.${session.user.id}&select=conference_id`,
+      { headers: authHeaders() },
+    );
     if (!res.ok) return [];
     const rows = await res.json();
-    return rows.map(r => r.conference_id);
+    return rows.map((r) => r.conference_id);
   },
 
   // ===== Notifications =====
   async getNotifications() {
     const session = getSession();
     if (!session?.user?.id) return [];
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/notifications?user_id=eq.${session.user.id}&order=created_at.desc&limit=50`, { headers: authHeaders() });
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/notifications?user_id=eq.${session.user.id}&order=created_at.desc&limit=50`,
+      { headers: authHeaders() },
+    );
     if (!res.ok) return [];
     return res.json();
   },
@@ -948,7 +1274,10 @@ const supabaseService = {
   async getUnreadCount() {
     const session = getSession();
     if (!session?.user?.id) return 0;
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/notifications?user_id=eq.${session.user.id}&unread=eq.true&select=id&limit=100`, { headers: authHeaders() });
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/notifications?user_id=eq.${session.user.id}&unread=eq.true&select=id&limit=100`,
+      { headers: authHeaders() },
+    );
     if (!res.ok) return 0;
     const data = await res.json();
     return data?.length || 0;
@@ -966,11 +1295,14 @@ const supabaseService = {
   async markAllNotificationsRead() {
     const session = getSession();
     if (!session?.user?.id) return;
-    await fetch(`${SUPABASE_URL}/rest/v1/notifications?user_id=eq.${session.user.id}&unread=eq.true`, {
-      method: 'PATCH',
-      headers: authHeaders(),
-      body: JSON.stringify({ unread: false }),
-    });
+    await fetch(
+      `${SUPABASE_URL}/rest/v1/notifications?user_id=eq.${session.user.id}&unread=eq.true`,
+      {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ unread: false }),
+      },
+    );
   },
 
   async createNotification(userId, kind, text, actorHandle, target, targetId) {
@@ -994,7 +1326,10 @@ const supabaseService = {
   },
 
   async getUserIdByHandle(handle) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?handle=eq.${encodeURIComponent(handle)}&select=id`, { headers: authHeaders() });
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?handle=eq.${encodeURIComponent(handle)}&select=id`,
+      { headers: authHeaders() },
+    );
     if (!res.ok) return null;
     const data = await res.json();
     return data?.[0]?.id || null;
@@ -1012,7 +1347,9 @@ const supabaseService = {
 
   // ===== Thread locking =====
   async toggleLockPost(postId) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/posts?id=eq.${postId}&select=locked`, { headers: authHeaders() });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/posts?id=eq.${postId}&select=locked`, {
+      headers: authHeaders(),
+    });
     if (!res.ok) return false;
     const data = await res.json();
     const current = data?.[0]?.locked;
@@ -1030,7 +1367,9 @@ const supabaseService = {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
       method: 'PATCH',
       headers: authHeaders(),
-      body: JSON.stringify({ suspended_until: until || new Date(Date.now() + 86400000 * 7).toISOString() }),
+      body: JSON.stringify({
+        suspended_until: until || new Date(Date.now() + 86400000 * 7).toISOString(),
+      }),
     });
     return res.ok;
   },
@@ -1047,9 +1386,12 @@ const supabaseService = {
   // ===== Search =====
   async searchPosts(query) {
     const q = encodeURIComponent(query);
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/feed_view?or=(title.ilike.%25${q}%25,body.ilike.%25${q}%25)&order=created_at.desc`, {
-      headers: authHeaders(),
-    });
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/feed_view?or=(title.ilike.%25${q}%25,body.ilike.%25${q}%25)&order=created_at.desc`,
+      {
+        headers: authHeaders(),
+      },
+    );
     if (!res.ok) return [];
     return res.json();
   },
@@ -1059,20 +1401,28 @@ const supabaseService = {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/polls`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ post_id: postId, question, options: JSON.stringify(options.map(o => ({ text: o, votes: 0 }))) }),
+      body: JSON.stringify({
+        post_id: postId,
+        question,
+        options: JSON.stringify(options.map((o) => ({ text: o, votes: 0 }))),
+      }),
     });
     return res.ok ? res.json() : null;
   },
 
   async getPoll(pollId) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/polls?id=eq.${pollId}`, { headers: authHeaders() });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/polls?id=eq.${pollId}`, {
+      headers: authHeaders(),
+    });
     if (!res.ok) return null;
     const data = await res.json();
     return data?.[0] || null;
   },
 
   async getPollByPost(postId) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/polls?post_id=eq.${postId}`, { headers: authHeaders() });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/polls?post_id=eq.${postId}`, {
+      headers: authHeaders(),
+    });
     if (!res.ok) return null;
     const data = await res.json();
     return data?.[0] || null;
@@ -1084,13 +1434,19 @@ const supabaseService = {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/poll_votes`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ poll_id: pollId, user_id: session.user.id, option_index: optionIndex }),
+      body: JSON.stringify({
+        poll_id: pollId,
+        user_id: session.user.id,
+        option_index: optionIndex,
+      }),
     });
     return res.ok;
   },
 
   async getPollVotes(pollId) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/poll_votes?poll_id=eq.${pollId}`, { headers: authHeaders() });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/poll_votes?poll_id=eq.${pollId}`, {
+      headers: authHeaders(),
+    });
     if (!res.ok) return [];
     return res.json();
   },
@@ -1100,13 +1456,21 @@ const supabaseService = {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/badges`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ user_id: userId, badge_id: badgeId, label: label || badgeId, icon: icon || 'medal' }),
+      body: JSON.stringify({
+        user_id: userId,
+        badge_id: badgeId,
+        label: label || badgeId,
+        icon: icon || 'medal',
+      }),
     });
     return res.ok;
   },
 
   async getBadges(userId) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/badges?user_id=eq.${userId}&order=awarded_at.desc`, { headers: authHeaders() });
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/badges?user_id=eq.${userId}&order=awarded_at.desc`,
+      { headers: authHeaders() },
+    );
     if (!res.ok) return [];
     return res.json();
   },

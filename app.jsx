@@ -1,10 +1,10 @@
 // App: routing + tweaks + Supabase auth
 
-const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-  "density": "comfortable",
-  "theme": "light",
-  "showSidebar": true
-}/*EDITMODE-END*/;
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/ {
+  density: 'comfortable',
+  theme: 'light',
+  showSidebar: true,
+}; /*EDITMODE-END*/
 
 function mapSbProfile(user, profile) {
   return {
@@ -30,13 +30,51 @@ function isSuspended(user) {
   return until > new Date();
 }
 
+const LogoutConfirmModal = ({ onClose, onConfirm }) => (
+  <div className="modal-wrap" onClick={onClose}>
+    <div
+      className="modal"
+      style={{ maxWidth: 420, width: '100%' }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="modal-head">
+        <div className="modal-eyebrow">
+          <Icon name="x" size={14} /> Confirm sign out
+        </div>
+        <button className="btn ghost icon-only" onClick={onClose}>
+          <Icon name="x" size={14} />
+        </button>
+      </div>
+      <div className="modal-body" style={{ textAlign: 'center', padding: '24px 24px 16px' }}>
+        <h3 style={{ margin: 0, fontSize: 20 }}>Are you sure you want to sign out?</h3>
+        <p style={{ margin: '12px 0 0', color: 'var(--text-2)', lineHeight: 1.5 }}>
+          You’ll need to sign back in to access the community.
+        </p>
+      </div>
+      <div className="modal-foot" style={{ justifyContent: 'center', gap: 12 }}>
+        <button className="btn ghost" onClick={onClose}>
+          Cancel
+        </button>
+        <button className="btn primary" onClick={onConfirm}>
+          Sign out
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 function App() {
   const [route, setRoute] = React.useState(() => routeFromPath());
   const [loggedIn, setLoggedIn] = React.useState(false);
   const [currentUser, setCurrentUser] = React.useState(null);
 
-  const cacheUser = (u) => { if (u?.handle) window.PROFILE_CACHE ? window.PROFILE_CACHE[u.handle] = u : null; };
-  const setAndCacheUser = (u) => { cacheUser(u); setCurrentUser(u); };
+  const cacheUser = (u) => {
+    if (u?.handle) window.PROFILE_CACHE ? (window.PROFILE_CACHE[u.handle] = u) : null;
+  };
+  const setAndCacheUser = (u) => {
+    cacheUser(u);
+    setCurrentUser(u);
+  };
   const [authLoading, setAuthLoading] = React.useState(true);
   const [composer, setComposer] = React.useState(null);
   const [signup, setSignup] = React.useState(false);
@@ -49,12 +87,15 @@ function App() {
   const [activeClass, setActiveClass] = React.useState(null);
   const [registered, setRegistered] = React.useState(() => new Set());
   const [toast, setToast] = React.useState(null);
+  const [logoutConfirm, setLogoutConfirm] = React.useState(false);
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [refreshTick, setRefreshTick] = React.useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   React.useEffect(() => {
     document.body.style.overflow = mobileMenuOpen ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [mobileMenuOpen]);
 
   // Register service worker for push notifications
@@ -66,9 +107,11 @@ function App() {
 
   window.sendBrowserNotification = (title, body, url) => {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    navigator.serviceWorker.ready.then(reg => {
-      reg.showNotification(title, { body, icon: '/favicon.ico', data: { url } });
-    }).catch(() => {});
+    navigator.serviceWorker.ready
+      .then((reg) => {
+        reg.showNotification(title, { body, icon: '/favicon.ico', data: { url } });
+      })
+      .catch(() => {});
   };
 
   window.requestNotifPermission = async () => {
@@ -86,12 +129,15 @@ function App() {
         const callbackSession = supabaseService.handleAuthCallback();
         const session = callbackSession || supabaseService.getSession();
         if (session?.access_token) {
-          const user = await supabaseService.getUser();
+          let user = session.user || null;
+          if (!user) {
+            user = await supabaseService.getUser().catch(() => null);
+          }
           if (user) {
-            const profile = await supabaseService.getProfile(user.id);
+            const profile = await supabaseService.getProfile(user.id).catch(() => null);
             const mapped = mapSbProfile(user, profile);
             setAndCacheUser(mapped);
-            setLoggedIn(true);
+            syncAuthState(mapped, true);
           }
         }
       } catch {}
@@ -99,7 +145,7 @@ function App() {
     })();
   }, []);
 
-  window.refreshUser = () => setRefreshTick(t => t + 1);
+  window.refreshUser = () => setRefreshTick((t) => t + 1);
 
   const showToast = (message) => {
     setToast(message);
@@ -108,24 +154,35 @@ function App() {
   };
   window.showToast = showToast;
 
+  const syncAuthState = (nextUser, nextLoggedIn) => {
+    setCurrentUser(nextUser);
+    setLoggedIn(nextLoggedIn);
+    window.currentUser = nextUser;
+    window.__authState = { loggedIn: nextLoggedIn, currentUser: nextUser };
+  };
+
   const signIn = async ({ email, password, onboardNext = false } = {}) => {
     if (email && password) {
       try {
         let loginEmail = email;
         if (!email.includes('@')) {
           const profile = await supabaseService.getProfileByHandle(email);
-          if (!profile?.email) { showToast('Handle not found'); return; }
+          if (!profile?.email) {
+            showToast('Handle not found');
+            return;
+          }
           loginEmail = profile.email;
         }
         const { user } = await supabaseService.signIn({ email: loginEmail, password });
         const profile = await supabaseService.getProfile(user.id);
-        setAndCacheUser(mapSbProfile(user, profile));
+        const mapped = mapSbProfile(user, profile);
+        setAndCacheUser(mapped);
+        syncAuthState(mapped, true);
       } catch (e) {
         showToast(e.message || 'Sign in failed');
         return;
       }
     }
-    setLoggedIn(true);
     if (onboardNext) setOnboard(true);
     navigate({ view: onboardNext ? 'feed' : 'home' });
     window.__notifRefresh?.();
@@ -139,8 +196,9 @@ function App() {
         return;
       }
       const profile = await supabaseService.getProfile(result.user.id);
-      setAndCacheUser(mapSbProfile(result.user, profile));
-      setLoggedIn(true);
+      const mapped = mapSbProfile(result.user, profile);
+      setAndCacheUser(mapped);
+      syncAuthState(mapped, true);
       setOnboard(true);
       navigate({ view: 'feed' });
       window.__notifRefresh?.();
@@ -149,10 +207,39 @@ function App() {
     }
   };
 
-  const signOut = async () => {
-    try { await supabaseService.signOut(); } catch {}
-    setLoggedIn(false);
-    setCurrentUser(null);
+  const handleAuthRequest = async ({
+    mode,
+    email,
+    password,
+    name,
+    handle,
+    onboardNext = false,
+  }) => {
+    if (mode === 'signup') {
+      return signUp({ email, password, name, handle });
+    }
+    return signIn({ email, password, onboardNext });
+  };
+
+  React.useEffect(() => {
+    window.__handleAuth = handleAuthRequest;
+    window.__setAuthState = (nextUser, nextLoggedIn) => syncAuthState(nextUser, nextLoggedIn);
+    return () => {
+      delete window.__handleAuth;
+      delete window.__setAuthState;
+    };
+  }, [currentUser, route.view]);
+
+  const signOut = () => {
+    setLogoutConfirm(true);
+  };
+
+  const confirmSignOut = async () => {
+    setLogoutConfirm(false);
+    try {
+      await supabaseService.signOut();
+    } catch {}
+    syncAuthState(null, false);
     setComposer(null);
     setNotifs(false);
     setPalette(false);
@@ -196,11 +283,19 @@ function App() {
 
   const registerClass = async (cls) => {
     if (registered.has(cls.id)) {
-      setRegistered(curr => { const n = new Set(curr); n.delete(cls.id); return n; });
+      setRegistered((curr) => {
+        const n = new Set(curr);
+        n.delete(cls.id);
+        return n;
+      });
       await conferenceService.unregister(cls.id, currentUser.handle);
       setToast(`Removed from ${cls.title}`);
     } else {
-      setRegistered(curr => { const n = new Set(curr); n.add(cls.id); return n; });
+      setRegistered((curr) => {
+        const n = new Set(curr);
+        n.add(cls.id);
+        return n;
+      });
       await conferenceService.register(cls.id, currentUser.handle);
       setToast(`Registered — we'll notify you when "${cls.title.split('—')[0].trim()}" goes live.`);
     }
@@ -213,7 +308,7 @@ function App() {
     const onKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setPalette(p => !p);
+        setPalette((p) => !p);
       }
     };
     document.addEventListener('keydown', onKey);
@@ -221,22 +316,87 @@ function App() {
   }, []);
 
   let main = null;
-  if (route.view === 'home') main = <HomeFeed navigate={navigate} currentUser={currentUser} onCompose={() => setComposer({})} onSignup={() => setSignup(true)} onJoinClass={(c) => setActiveClass(c)} onJoinSpace={(s) => setActiveSpace(s)} />;
-  else if (route.view === 'feed') main = <FeedView navigate={navigate} onCompose={() => setComposer({})} currentUser={currentUser} />;
-  else if (route.view === 'search') main = <SearchPage navigate={navigate} currentUser={currentUser} />;
-  else if (route.view === 'talent') main = <TalentPage navigate={navigate} currentUser={currentUser} />;
+  if (route.view === 'home')
+    main = (
+      <HomeFeed
+        navigate={navigate}
+        currentUser={currentUser}
+        onCompose={() => setComposer({})}
+        onSignup={() => setSignup(true)}
+        onJoinClass={(c) => setActiveClass(c)}
+        onJoinSpace={(s) => setActiveSpace(s)}
+      />
+    );
+  else if (route.view === 'feed')
+    main = (
+      <FeedView navigate={navigate} onCompose={() => setComposer({})} currentUser={currentUser} />
+    );
+  else if (route.view === 'search')
+    main = <SearchPage navigate={navigate} currentUser={currentUser} />;
+  else if (route.view === 'talent')
+    main = <TalentPage navigate={navigate} currentUser={currentUser} />;
   else if (route.view === 'gig') main = <GigDetailPage id={route.id} navigate={navigate} />;
-  else if (route.view === 'spaces') main = <SpacesPage navigate={navigate} currentUser={currentUser} onJoinSpace={(s) => setActiveSpace(s)} />;
-  else if (route.view === 'members') main = <MembersPage navigate={navigate} onOpenCard={(h) => setMemberCard(h)} />;
-  else if (route.view === 'studio') main = <StudioPage navigate={navigate} currentUser={currentUser} registered={registered} onRegister={registerClass} onJoin={(c) => setActiveClass(c)} onSchedule={() => setScheduleClass(true)} />;
-  else if (route.view === 'messages') main = <MessagesPage navigate={navigate} currentUser={currentUser} />;
-  else if (route.view === 'category') main = <CategoryPage catId={route.cat} navigate={navigate} currentUser={currentUser} showToast={showToast} onCompose={() => setComposer({ defaultCat: route.cat })} />;
-  else if (route.view === 'topic') main = <TopicPage topicId={route.topic} navigate={navigate} currentUser={currentUser} />;
-  else if (route.view === 'profile') main = <ProfilePage handle={route.handle} navigate={navigate} tab={route.tab} currentUser={currentUser} />;
-  else if (route.view === 'leaderboard') main = <LeaderboardPage navigate={navigate} currentUser={currentUser} />;
-  else if (route.view === 'events') main = <EventsPage navigate={navigate} registered={registered} onRegister={registerClass} onJoin={(c) => setActiveClass(c)} currentUser={currentUser} onSchedule={() => setScheduleClass(true)} />;
-  else if (route.view === 'content') main = <ContentPage navigate={navigate} currentUser={currentUser} />;
-  else if (route.view === 'tag') main = <TagPage tag={route.tag} navigate={navigate} currentUser={currentUser} />;
+  else if (route.view === 'spaces')
+    main = (
+      <SpacesPage
+        navigate={navigate}
+        currentUser={currentUser}
+        onJoinSpace={(s) => setActiveSpace(s)}
+      />
+    );
+  else if (route.view === 'members')
+    main = <MembersPage navigate={navigate} onOpenCard={(h) => setMemberCard(h)} />;
+  else if (route.view === 'studio')
+    main = (
+      <StudioPage
+        navigate={navigate}
+        currentUser={currentUser}
+        registered={registered}
+        onRegister={registerClass}
+        onJoin={(c) => setActiveClass(c)}
+        onSchedule={() => setScheduleClass(true)}
+      />
+    );
+  else if (route.view === 'messages')
+    main = <MessagesPage navigate={navigate} currentUser={currentUser} />;
+  else if (route.view === 'category')
+    main = (
+      <CategoryPage
+        catId={route.cat}
+        navigate={navigate}
+        currentUser={currentUser}
+        showToast={showToast}
+        onCompose={() => setComposer({ defaultCat: route.cat })}
+      />
+    );
+  else if (route.view === 'topic')
+    main = <TopicPage topicId={route.topic} navigate={navigate} currentUser={currentUser} />;
+  else if (route.view === 'profile')
+    main = (
+      <ProfilePage
+        handle={route.handle}
+        navigate={navigate}
+        tab={route.tab}
+        currentUser={currentUser}
+      />
+    );
+  else if (route.view === 'leaderboard')
+    main = <LeaderboardPage navigate={navigate} currentUser={currentUser} />;
+  else if (route.view === 'events')
+    main = (
+      <EventsPage
+        navigate={navigate}
+        registered={registered}
+        onRegister={registerClass}
+        onJoin={(c) => setActiveClass(c)}
+        currentUser={currentUser}
+        onSchedule={() => setScheduleClass(true)}
+      />
+    );
+  else if (route.view === 'content')
+    main = <ContentPage navigate={navigate} currentUser={currentUser} />;
+  else if (route.view === 'tag')
+    main = <TagPage tag={route.tag} navigate={navigate} currentUser={currentUser} />;
   else if (route.view === 'article') main = <ArticlePage id={route.id} navigate={navigate} />;
 
   return (
@@ -244,71 +404,158 @@ function App() {
       {!loggedIn && !authLoading && (
         <AuthPage
           onSignedIn={({ email, password }) => signIn({ email, password })}
-          onSignedUp={({ email, password, name, handle }) => signUp({ email, password, name, handle })}
+          onSignedUp={({ email, password, name, handle }) =>
+            signUp({ email, password, name, handle })
+          }
         />
       )}
-      {authLoading && <div className="view" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p>Loading...</p></div>}
-      {loggedIn && (
-      <React.Fragment>
-      <TopBar route={route} navigate={navigate} onCompose={() => setComposer({})} currentUser={currentUser} onOpenNotifs={() => setNotifs(true)} onOpenSearch={() => setPalette(true)} onLogout={signOut} onToggleMenu={() => setMobileMenuOpen(m => !m)} />
-      <div className="shell">
-        <Sidebar route={route} navigate={navigate} currentUser={currentUser} />
-        {mobileMenuOpen && (
-          <div className="sidebar-overlay open" onClick={() => setMobileMenuOpen(false)}>
-            <div onClick={e => e.stopPropagation()}>
-              <Sidebar route={route} navigate={navigate} currentUser={currentUser} />
-            </div>
-          </div>
-        )}
-        <main className="main-col">
-          {isSuspended(currentUser) && (
-            <div className="suspension-banner" style={{ padding: '12px 16px', background: '#fff3e0', borderBottom: '1px solid #ffcc80', color: '#e65100', fontSize: 14, textAlign: 'center' }}>
-              Your account is suspended until {new Date(currentUser.suspended_until).toLocaleDateString()}. You can read but cannot post, comment, or interact.
-            </div>
-          )}
-          {main}
-        </main>
-      </div>
-
-      {composer && <Composer onClose={() => setComposer(null)} defaultCat={composer.defaultCat} currentUser={currentUser} />}
-
-      {notifs && <NotificationsDrawer onClose={() => setNotifs(false)} navigate={(r) => { setNotifs(false); navigate(r); }} />}
-
-      {activeSpace && <LiveSpaceDrawer space={activeSpace} onClose={() => setActiveSpace(null)} currentUser={currentUser} />}
-
-      {memberCard && <MemberCard handle={memberCard} onClose={() => setMemberCard(null)} navigate={navigate} />}
-
-      {scheduleClass && <ScheduleClassModal onClose={() => setScheduleClass(false)} currentUser={currentUser} onScheduled={() => { if (window.__studioRefresh) window.__studioRefresh(); }} />}
-
-      {activeClass && <ClassroomView cls={activeClass} currentUser={currentUser} onLeave={() => setActiveClass(null)} />}
-
-      {toast && (
-        <div className="app-toast">
-          <Icon name="check" size={14} /> {toast}
+      {authLoading && (
+        <div
+          className="view"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <p>Loading...</p>
         </div>
       )}
+      {loggedIn && (
+        <React.Fragment>
+          <TopBar
+            route={route}
+            navigate={navigate}
+            onCompose={() => setComposer({})}
+            currentUser={currentUser}
+            onOpenNotifs={() => setNotifs(true)}
+            onOpenSearch={() => setPalette(true)}
+            onLogout={signOut}
+            onToggleMenu={() => setMobileMenuOpen((m) => !m)}
+          />
+          <div className="shell">
+            <Sidebar route={route} navigate={navigate} currentUser={currentUser} />
+            {mobileMenuOpen && (
+              <div className="sidebar-overlay open" onClick={() => setMobileMenuOpen(false)}>
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Sidebar route={route} navigate={navigate} currentUser={currentUser} />
+                </div>
+              </div>
+            )}
+            <main className="main-col">
+              {isSuspended(currentUser) && (
+                <div
+                  className="suspension-banner"
+                  style={{
+                    padding: '12px 16px',
+                    background: '#fff3e0',
+                    borderBottom: '1px solid #ffcc80',
+                    color: '#e65100',
+                    fontSize: 14,
+                    textAlign: 'center',
+                  }}
+                >
+                  Your account is suspended until{' '}
+                  {new Date(currentUser.suspended_until).toLocaleDateString()}. You can read but
+                  cannot post, comment, or interact.
+                </div>
+              )}
+              {main}
+            </main>
+          </div>
 
-      {signup && (
-        <SignupModal
-          onClose={() => setSignup(false)}
-          onComplete={() => {
-            setSignup(false);
-            signIn({ onboardNext: true });
-          }}
-        />
-      )}
+          {composer && (
+            <Composer
+              onClose={() => setComposer(null)}
+              defaultCat={composer.defaultCat}
+              currentUser={currentUser}
+            />
+          )}
 
-      {onboard && (
-        <OnboardingWizard
-          currentUser={currentUser}
-          onClose={() => setOnboard(false)}
-          onComplete={() => { setOnboard(false); navigate({ view: 'feed' }); }}
-        />
-      )}
+          {notifs && (
+            <NotificationsDrawer
+              onClose={() => setNotifs(false)}
+              navigate={(r) => {
+                setNotifs(false);
+                navigate(r);
+              }}
+            />
+          )}
 
-      {palette && <CommandPalette currentUser={currentUser} onClose={() => setPalette(false)} navigate={(r) => { setPalette(false); navigate(r); }} />}
+          {activeSpace && (
+            <LiveSpaceDrawer
+              space={activeSpace}
+              onClose={() => setActiveSpace(null)}
+              currentUser={currentUser}
+            />
+          )}
 
-      </React.Fragment>
+          {memberCard && (
+            <MemberCard
+              handle={memberCard}
+              onClose={() => setMemberCard(null)}
+              navigate={navigate}
+            />
+          )}
+
+          {scheduleClass && (
+            <ScheduleClassModal
+              onClose={() => setScheduleClass(false)}
+              currentUser={currentUser}
+              onScheduled={() => {
+                if (window.__studioRefresh) window.__studioRefresh();
+              }}
+            />
+          )}
+
+          {activeClass && (
+            <ClassroomView
+              cls={activeClass}
+              currentUser={currentUser}
+              onLeave={() => setActiveClass(null)}
+            />
+          )}
+
+          {toast && (
+            <div className="app-toast">
+              <Icon name="check" size={14} /> {toast}
+            </div>
+          )}
+
+          {signup && (
+            <SignupModal
+              onClose={() => setSignup(false)}
+              onComplete={() => {
+                setSignup(false);
+                signIn({ onboardNext: true });
+              }}
+            />
+          )}
+
+          {onboard && (
+            <OnboardingWizard
+              currentUser={currentUser}
+              onClose={() => setOnboard(false)}
+              onComplete={() => {
+                setOnboard(false);
+                navigate({ view: 'feed' });
+              }}
+            />
+          )}
+
+          {palette && (
+            <CommandPalette
+              currentUser={currentUser}
+              onClose={() => setPalette(false)}
+              navigate={(r) => {
+                setPalette(false);
+                navigate(r);
+              }}
+            />
+          )}
+          {logoutConfirm && (
+            <LogoutConfirmModal
+              onClose={() => setLogoutConfirm(false)}
+              onConfirm={confirmSignOut}
+            />
+          )}
+        </React.Fragment>
       )}
 
       {/* signup is reachable from the landing page too */}
@@ -316,48 +563,61 @@ function App() {
         <OnboardingWizard
           currentUser={currentUser}
           onClose={() => setOnboard(false)}
-          onComplete={() => { setOnboard(false); navigate({ view: 'feed' }); }}
+          onComplete={() => {
+            setOnboard(false);
+            navigate({ view: 'feed' });
+          }}
         />
       )}
 
       {loggedIn && (
-      <TweaksPanel title="Tweaks">
-        <TweakSection title="Theme">
-          <TweakRadio
-            label="Mode"
-            value={t.theme}
-            options={[
-              { value: 'light', label: 'Light' },
-              { value: 'dim', label: 'Dim' },
-            ]}
-            onChange={v => setTweak('theme', v)}
-          />
-        </TweakSection>
-        <TweakSection title="Layout">
-          <TweakRadio
-            label="Density"
-            value={t.density}
-            options={[
-              { value: 'compact', label: 'Compact' },
-              { value: 'comfortable', label: 'Comfort' },
-            ]}
-            onChange={v => setTweak('density', v)}
-          />
-          <TweakToggle
-            label="Sidebar"
-            value={t.showSidebar}
-            onChange={v => setTweak('showSidebar', v)}
-          />
-        </TweakSection>
-        <TweakSection title="Jump to">
-          <TweakButton label="Sign out / auth screen" onClick={signOut} />
-          <TweakButton label="Home" onClick={() => navigate({ view: 'home' })} />
-          <TweakButton label="Wallet" onClick={() => navigate({ view: 'profile', handle: currentUser.handle, tab: 'wallet' })} />
-          <TweakButton label="Saved" onClick={() => navigate({ view: 'profile', handle: currentUser.handle, tab: 'saved' })} />
-          <TweakButton label="Search (⌘K)" onClick={() => setPalette(true)} />
-          <TweakButton label="Run onboarding" onClick={() => setOnboard(true)} />
-        </TweakSection>
-      </TweaksPanel>
+        <TweaksPanel title="Tweaks">
+          <TweakSection title="Theme">
+            <TweakRadio
+              label="Mode"
+              value={t.theme}
+              options={[
+                { value: 'light', label: 'Light' },
+                { value: 'dim', label: 'Dim' },
+              ]}
+              onChange={(v) => setTweak('theme', v)}
+            />
+          </TweakSection>
+          <TweakSection title="Layout">
+            <TweakRadio
+              label="Density"
+              value={t.density}
+              options={[
+                { value: 'compact', label: 'Compact' },
+                { value: 'comfortable', label: 'Comfort' },
+              ]}
+              onChange={(v) => setTweak('density', v)}
+            />
+            <TweakToggle
+              label="Sidebar"
+              value={t.showSidebar}
+              onChange={(v) => setTweak('showSidebar', v)}
+            />
+          </TweakSection>
+          <TweakSection title="Jump to">
+            <TweakButton label="Sign out / auth screen" onClick={signOut} />
+            <TweakButton label="Home" onClick={() => navigate({ view: 'home' })} />
+            <TweakButton
+              label="Wallet"
+              onClick={() =>
+                navigate({ view: 'profile', handle: currentUser.handle, tab: 'wallet' })
+              }
+            />
+            <TweakButton
+              label="Saved"
+              onClick={() =>
+                navigate({ view: 'profile', handle: currentUser.handle, tab: 'saved' })
+              }
+            />
+            <TweakButton label="Search (⌘K)" onClick={() => setPalette(true)} />
+            <TweakButton label="Run onboarding" onClick={() => setOnboard(true)} />
+          </TweakSection>
+        </TweaksPanel>
       )}
     </div>
   );

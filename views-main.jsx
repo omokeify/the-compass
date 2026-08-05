@@ -2,15 +2,22 @@
 
 // ---------- HOME ----------
 const HomeFeed = ({ navigate, currentUser, onCompose, onSignup, onJoinClass, onJoinSpace }) => {
-  const liveClass = (window.CONFERENCES || []).find(c => c.status === 'live');
+  const liveClass = (window.CONFERENCES || []).find((c) => c.status === 'live');
   return (
     <div className="view home">
       {liveClass && (
         <button className="live-now-banner" onClick={() => onJoinClass && onJoinClass(liveClass)}>
-          <span className="lnb-pip"><span className="space-live-pip" /> LIVE CLASS</span>
+          <span className="lnb-pip">
+            <span className="space-live-pip" /> LIVE CLASS
+          </span>
           <span className="lnb-title">{liveClass.title}</span>
-          <span className="lnb-host">{userByHandle(liveClass.host).name} is teaching now · {liveClass.attending} watching</span>
-          <span className="lnb-cta">Join <Icon name="arrow-right" size={13} /></span>
+          <span className="lnb-host">
+            {userByHandle(liveClass.host).name} is teaching now ·{' '}
+            {liveClass.attending || liveClass.registered || liveClass.attended || 0} watching
+          </span>
+          <span className="lnb-cta">
+            Join <Icon name="arrow-right" size={13} />
+          </span>
         </button>
       )}
 
@@ -67,7 +74,9 @@ const HomeFeedStream = ({ navigate, onCompose, currentUser }) => {
     <div className="section">
       <div className="section-head">
         <div>
-          <div className="section-eyebrow"><span className="section-eyebrow-dot" /> Live · the feed</div>
+          <div className="section-eyebrow">
+            <span className="section-eyebrow-dot" /> Live · the feed
+          </div>
           <h2 className="section-title">What the community is shipping right now.</h2>
         </div>
         <div className="section-tools">
@@ -90,31 +99,50 @@ const HomeFeedStream = ({ navigate, onCompose, currentUser }) => {
           </div>
 
           <div className="feed-stream">
-            {items.map(item => <FeedCard key={item.id} item={item} navigate={navigate} />)}
+            {items.map((item) => (
+              <FeedCard key={item.id} item={item} navigate={navigate} />
+            ))}
           </div>
 
-          <button className="btn solid lg home-feed-more" onClick={() => navigate({ view: 'feed' })}>
+          <button
+            className="btn solid lg home-feed-more"
+            onClick={() => navigate({ view: 'feed' })}
+          >
             See all 9 posts in your feed <Icon name="arrow-right" size={13} />
           </button>
         </div>
 
         <aside className="home-feed-rail">
           <div className="rail-card">
-            <div className="rail-card-head"><span className="rail-card-title">Trending</span></div>
+            <div className="rail-card-head">
+              <span className="rail-card-title">Trending</span>
+            </div>
             <ul className="rail-tags">
-              {TRENDING_TAGS.slice(0, 6).map(t => (
-                <li key={t.tag} className="rail-tag" onClick={() => navigate({ view: 'tag', tag: t.tag })} style={{ cursor: 'pointer' }}>
-                  <span className="rt-h">#</span>{t.tag}
+              {TRENDING_TAGS.slice(0, 6).map((t) => (
+                <li
+                  key={t.tag}
+                  className="rail-tag"
+                  onClick={() => navigate({ view: 'tag', tag: t.tag })}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <span className="rt-h">#</span>
+                  {t.tag}
                   <span className="rt-c">{t.count}</span>
                 </li>
               ))}
             </ul>
           </div>
           <div className="rail-card">
-            <div className="rail-card-head"><span className="rail-card-title">Who to follow</span></div>
+            <div className="rail-card-head">
+              <span className="rail-card-title">Who to follow</span>
+            </div>
             <ul className="rail-users">
-              {(window.SUGGESTED_USERS || []).slice(0,3).map(u => (
-                <li key={u.id} className="rail-user" onClick={() => navigate({ view: 'profile', handle: u.handle })}>
+              {(window.SUGGESTED_USERS || []).slice(0, 3).map((u) => (
+                <li
+                  key={u.id}
+                  className="rail-user"
+                  onClick={() => navigate({ view: 'profile', handle: u.handle })}
+                >
                   <Avatar user={u} size={28} />
                   <div className="ru-body">
                     <div className="ru-name">{u.name}</div>
@@ -138,7 +166,11 @@ const OnlineMembersStrip = ({ navigate }) => {
       <div className="online-head">
         <div>
           <h2 className="online-title">
-            Online <span className="online-count"><span className="online-dot" />{ONLINE_MEMBERS.length} now</span>
+            Online{' '}
+            <span className="online-count">
+              <span className="online-dot" />
+              {ONLINE_MEMBERS.length} now
+            </span>
           </h2>
         </div>
         <button className="btn solid" onClick={() => navigate({ view: 'members' })}>
@@ -161,38 +193,69 @@ const OnlineMembersStrip = ({ navigate }) => {
 
 // ---------- Content Section ----------
 const CONTENT_BG = {
-  navy:     { from: '#0c0f24', to: '#1e2a5a' },
-  royal:    { from: '#172275', to: '#3349c4' },
+  navy: { from: '#0c0f24', to: '#1e2a5a' },
+  royal: { from: '#172275', to: '#3349c4' },
   midnight: { from: '#080a18', to: '#1a1e3a' },
-  plum:     { from: '#2a1456', to: '#5a2b95' },
-  forest:   { from: '#0e2a1c', to: '#1f4a32' },
+  plum: { from: '#2a1456', to: '#5a2b95' },
+  forest: { from: '#0e2a1c', to: '#1f4a32' },
 };
 
 const ContentSection = ({ navigate }) => {
   const [tab, setTab] = React.useState('latest');
+  const [kindFilter, setKindFilter] = React.useState('all');
+  const items = CONTENT_ITEMS.filter((item) => kindFilter === 'all' || item.kind === kindFilter);
   return (
     <div className="section">
       <div className="section-head">
         <div>
-          <div className="section-eyebrow"><span className="section-eyebrow-dot" /> Editorial</div>
+          <div className="section-eyebrow">
+            <span className="section-eyebrow-dot" /> Editorial
+          </div>
           <h2 className="section-title">Content from the community.</h2>
         </div>
         <div className="content-tools">
           <div className="content-tabs">
-            <button className={`content-tab ${tab === 'latest' ? 'active' : ''}`} onClick={() => setTab('latest')}>Latest</button>
-            <button className={`content-tab ${tab === 'popular' ? 'active' : ''}`} onClick={() => setTab('popular')}>Popular</button>
+            <button
+              className={`content-tab ${tab === 'latest' ? 'active' : ''}`}
+              onClick={() => setTab('latest')}
+            >
+              Latest
+            </button>
+            <button
+              className={`content-tab ${tab === 'popular' ? 'active' : ''}`}
+              onClick={() => setTab('popular')}
+            >
+              Popular
+            </button>
           </div>
-          <button className="content-dd">All Tags <Icon name="arrow-down" size={11} /></button>
-          <button className="content-dd">All <Icon name="arrow-down" size={11} /></button>
+          <button
+            type="button"
+            className={`content-dd ${kindFilter === 'all' ? 'active' : ''}`}
+            onClick={() => setKindFilter('all')}
+          >
+            All Tags <Icon name="arrow-down" size={11} />
+          </button>
+          <button
+            type="button"
+            className={`content-dd ${kindFilter === 'article' ? 'active' : ''}`}
+            onClick={() => setKindFilter('article')}
+          >
+            Articles <Icon name="arrow-down" size={11} />
+          </button>
         </div>
       </div>
       <div className="content-grid">
-        {CONTENT_ITEMS.map(item => {
+        {items.map((item) => {
           const bg = CONTENT_BG[item.bg] || CONTENT_BG.navy;
           const author = userByHandle(item.author);
           return (
-            <article key={item.id} className="content-card" style={{ '--cc-from': bg.from, '--cc-to': bg.to }} onClick={() => navigate({ view: 'article', id: item.id })}>
-              <div className="cc-cover">
+            <article
+              key={item.id}
+              className="content-card"
+              style={{ '--cc-from': bg.from, '--cc-to': bg.to }}
+              onClick={() => navigate({ view: 'article', id: item.id })}
+            >
+              <div className="cc-cover" style={{ width: '100%' }}>
                 <div className="cc-grid" />
                 <div className="cc-rings" />
                 <div className="cc-kind">{`{ ${item.kind.toUpperCase()} }`}</div>
@@ -219,8 +282,8 @@ const ContentSection = ({ navigate }) => {
 
 // ---------- Spaces Section (home page) ----------
 const SpacesSection = ({ navigate, onJoinSpace }) => {
-  const live = SPACES.filter(s => s.status === 'live');
-  const upcoming = SPACES.filter(s => s.status === 'scheduled').slice(0, 3);
+  const live = SPACES.filter((s) => s.status === 'live');
+  const upcoming = SPACES.filter((s) => s.status === 'scheduled').slice(0, 3);
 
   if (live.length === 0 && upcoming.length === 0) return null;
 
@@ -233,9 +296,13 @@ const SpacesSection = ({ navigate, onJoinSpace }) => {
     <div className="section">
       <div className="section-head">
         <div>
-          <div className="section-eyebrow"><span className="section-eyebrow-dot" /> Live audio</div>
+          <div className="section-eyebrow">
+            <span className="section-eyebrow-dot" /> Live audio
+          </div>
           <h2 className="section-title">
-            {live.length > 0 ? `${live.length} space${live.length > 1 ? 's' : ''} live now` : 'Upcoming spaces.'}
+            {live.length > 0
+              ? `${live.length} space${live.length > 1 ? 's' : ''} live now`
+              : 'Upcoming spaces.'}
           </h2>
         </div>
         <div className="section-tools">
@@ -245,8 +312,12 @@ const SpacesSection = ({ navigate, onJoinSpace }) => {
         </div>
       </div>
       <div className="spaces-grid" style={{ marginTop: 8 }}>
-        {live.map(s => <SpaceCard key={s.id} space={s} onJoin={() => handleJoin(s)} navigate={navigate} />)}
-        {upcoming.map(s => <SpaceCard key={s.id} space={s} onJoin={() => {}} navigate={navigate} />)}
+        {live.map((s) => (
+          <SpaceCard key={s.id} space={s} onJoin={() => handleJoin(s)} navigate={navigate} />
+        ))}
+        {upcoming.map((s) => (
+          <SpaceCard key={s.id} space={s} onJoin={() => {}} navigate={navigate} />
+        ))}
       </div>
     </div>
   );
@@ -280,14 +351,16 @@ const HeroCard = ({ navigate, onCompose, onSignup }) => {
             <span>Join 14,820 builders · no wallet required</span>
           </div>
           <h1 className="hero-title">
-            One <em>compass.</em><br/>
-            Every community-led<br/>
+            One <em>compass.</em>
+            <br />
+            Every community-led
+            <br />
             opportunity.
           </h1>
           <p className="hero-sub">
-            The Compass is where African builders, founders and creators trade signal —
-            curated news, validated alpha, real bounties, live training, and IRL events.
-            Join the network finding north together.
+            The Compass is where African builders, founders and creators trade signal — curated
+            news, validated alpha, real bounties, live training, and IRL events. Join the network
+            finding north together.
           </p>
           <div className="hero-actions">
             <button className="hero-cta" onClick={onSignup}>
@@ -299,19 +372,44 @@ const HeroCard = ({ navigate, onCompose, onSignup }) => {
           </div>
           <div className="hero-trust">
             <AvatarStack handles={['amara', 'felix', 'zara']} size={26} max={5} />
-            <span><strong>4.9</strong> · 1,284 builders trust Compass for their daily edge.</span>
+            <span>
+              <strong>4.9</strong> · 1,284 builders trust Compass for their daily edge.
+            </span>
           </div>
         </div>
 
         <div className="hero-code" ref={codeRef}>
-          <div><span className="hc-comment">// welcome to</span></div>
-          <div><span className="hc-punct">{'{'}</span> <span className="hc-key">Compass</span> <span className="hc-punct">{'}'}</span></div>
-          <div>.<span className="hc-fn">builders</span><span className="hc-punct">();</span></div>
+          <div>
+            <span className="hc-comment">// welcome to</span>
+          </div>
+          <div>
+            <span className="hc-punct">{'{'}</span> <span className="hc-key">Compass</span>{' '}
+            <span className="hc-punct">{'}'}</span>
+          </div>
+          <div>
+            .<span className="hc-fn">builders</span>
+            <span className="hc-punct">();</span>
+          </div>
           <div style={{ height: 14 }} />
-          <div><span className="hc-key">community</span><span className="hc-punct">:</span> <span className="hc-str">"africa-first"</span><span className="hc-punct">,</span></div>
-          <div><span className="hc-key">members</span><span className="hc-punct">:</span> <span className="hc-str">14,820</span><span className="hc-punct">,</span></div>
-          <div><span className="hc-key">categories</span><span className="hc-punct">:</span> <span className="hc-str">8</span><span className="hc-punct">,</span></div>
-          <div><span className="hc-key">bearing</span><span className="hc-punct">:</span> <span className="hc-str">"038°"</span></div>
+          <div>
+            <span className="hc-key">community</span>
+            <span className="hc-punct">:</span> <span className="hc-str">"africa-first"</span>
+            <span className="hc-punct">,</span>
+          </div>
+          <div>
+            <span className="hc-key">members</span>
+            <span className="hc-punct">:</span> <span className="hc-str">14,820</span>
+            <span className="hc-punct">,</span>
+          </div>
+          <div>
+            <span className="hc-key">categories</span>
+            <span className="hc-punct">:</span> <span className="hc-str">8</span>
+            <span className="hc-punct">,</span>
+          </div>
+          <div>
+            <span className="hc-key">bearing</span>
+            <span className="hc-punct">:</span> <span className="hc-str">"038°"</span>
+          </div>
         </div>
       </div>
     </section>
@@ -320,7 +418,7 @@ const HeroCard = ({ navigate, onCompose, onSignup }) => {
 
 // ---------- Events Section (horizontal scroller) ----------
 const EventsSection = ({ navigate }) => {
-  const events = [];
+  const events = (window.EVENTS_UPCOMING || []).slice(0, 4);
 
   return (
     <div className="section">
@@ -329,7 +427,6 @@ const EventsSection = ({ navigate }) => {
           <div className="section-eyebrow">
             <span className="section-eyebrow-dot" /> Happening soon
           </div>
-
         </div>
         <div className="section-tools">
           <button className="section-link" onClick={() => navigate({ view: 'events' })}>
@@ -338,8 +435,13 @@ const EventsSection = ({ navigate }) => {
         </div>
       </div>
       <div className="events-row">
-        {events.map(e => (
-          <article key={e.id} className="event-card" style={{ '--ev-from': e.from, '--ev-to': e.to }}>
+        {events.map((e) => (
+          <article
+            key={e.id}
+            className="event-card"
+            style={{ '--ev-from': e.from, '--ev-to': e.to, cursor: 'pointer' }}
+            onClick={() => navigate({ view: 'events' })}
+          >
             <div className="event-cover">
               <span className={`event-badge ${e.tag === 'Now' ? 'now' : ''}`}>
                 {e.tag || e.kind}
@@ -349,8 +451,10 @@ const EventsSection = ({ navigate }) => {
             <div className="event-card-body">
               <h3 className="event-card-title">{e.sub}</h3>
               <div className="event-card-meta">
-                <span>{e.date}</span>
-                <span className="ec-going"><Icon name="users" size={11} /> {e.going}</span>
+                <span className="event-date">{e.date}</span>
+                <span className="ec-going">
+                  <Icon name="users" size={11} /> {e.going}
+                </span>
               </div>
             </div>
           </article>
@@ -362,16 +466,20 @@ const EventsSection = ({ navigate }) => {
 
 // ---------- Categories Section (Gradual-style pastel grid) ----------
 const CategoriesSection = ({ navigate, currentUser }) => {
-  const visibleCategories = currentUser ? CATEGORIES.filter(cat => canViewCategory(currentUser, cat.id)) : CATEGORIES;
+  const visibleCategories = currentUser
+    ? CATEGORIES.filter((cat) => canViewCategory(currentUser, cat.id))
+    : CATEGORIES;
   return (
     <div className="section">
       <div className="section-head">
         <div>
-          <div className="section-eyebrow"><span className="section-eyebrow-dot" /> Eight directions</div>
+          <div className="section-eyebrow">
+            <span className="section-eyebrow-dot" /> Eight directions
+          </div>
           <h2 className="section-title">Your voice. Your people. Your community.</h2>
           <p className="section-sub">
-            Every conversation, opportunity and resource — sorted across eight pillars 
-            of the Compass community.
+            Every conversation, opportunity and resource — sorted across eight pillars of the
+            Compass community.
           </p>
         </div>
       </div>
@@ -389,7 +497,9 @@ const CategoriesSection = ({ navigate, currentUser }) => {
               <div className="cat-card-deco">
                 <span className={decoClass} />
               </div>
-              <div className="cat-card-num">{cat.code} / 08 — {cat.name.split(' ')[0]}</div>
+              <div className="cat-card-num">
+                {cat.code} / 08 — {cat.name.split(' ')[0]}
+              </div>
               <h3 className="cat-card-title">{cat.name}</h3>
               <div className="cat-card-meta">
                 <Icon name="arrow-right" size={14} />
@@ -407,15 +517,15 @@ const DiscussionsSection = ({ navigate, currentUser }) => {
   const [filter, setFilter] = React.useState('latest');
   const filters = [
     { id: 'latest', label: 'Latest' },
-    { id: 'top',    label: 'Top' },
-    { id: 'hot',    label: 'Hot' },
+    { id: 'top', label: 'Top' },
+    { id: 'hot', label: 'Hot' },
     { id: 'unread', label: 'Unread' },
   ];
 
   let list = [...TOPICS];
-  if (currentUser) list = list.filter(t => canViewTopic(currentUser, t));
+  if (currentUser) list = list.filter((t) => canViewTopic(currentUser, t));
   if (filter === 'top') list.sort((a, b) => b.likes - a.likes);
-  else if (filter === 'hot') list = list.filter(t => t.hot || t.pinned);
+  else if (filter === 'hot') list = list.filter((t) => t.hot || t.pinned);
   else if (filter === 'unread') list = list.slice(0, 4);
   else list.sort((a, b) => (a.pinned ? -1 : 0) - (b.pinned ? -1 : 0));
 
@@ -425,11 +535,16 @@ const DiscussionsSection = ({ navigate, currentUser }) => {
     <div className="section">
       <div className="section-head">
         <div>
-          <div className="section-eyebrow"><span className="section-eyebrow-dot" /> The conversation</div>
+          <div className="section-eyebrow">
+            <span className="section-eyebrow-dot" /> The conversation
+          </div>
           <h2 className="section-title">Discussions.</h2>
         </div>
         <div className="section-tools">
-          <button className="section-link" onClick={() => navigate({ view: 'category', cat: 'news' })}>
+          <button
+            className="section-link"
+            onClick={() => navigate({ view: 'category', cat: 'news' })}
+          >
             View all <Icon name="arrow-right" size={12} />
           </button>
         </div>
@@ -438,15 +553,21 @@ const DiscussionsSection = ({ navigate, currentUser }) => {
       <div className="discussion-card">
         <div className="df-head">
           <div className="df-tabs">
-            {filters.map(f => (
-              <button key={f.id} className={`df-tab ${filter === f.id ? 'active' : ''}`} onClick={() => setFilter(f.id)}>
+            {filters.map((f) => (
+              <button
+                key={f.id}
+                className={`df-tab ${filter === f.id ? 'active' : ''}`}
+                onClick={() => setFilter(f.id)}
+              >
                 {f.label}
               </button>
             ))}
           </div>
           <div className="df-head-title">{list.length} topics</div>
         </div>
-        {list.map(t => <TopicRow key={t.id} topic={t} navigate={navigate} />)}
+        {list.map((t) => (
+          <TopicRow key={t.id} topic={t} navigate={navigate} />
+        ))}
       </div>
     </div>
   );
@@ -457,13 +578,21 @@ const MembersSection = ({ navigate }) => {
   const [top, setTop] = React.useState([]);
   React.useEffect(() => {
     const sb = window.supabaseService;
-    sb?.getTopMembers(5).then(setTop).catch(() => {});
+    if (sb) {
+      sb.getTopMembers(5)
+        .then(setTop)
+        .catch(() => setTop(USERS.slice(0, 5)));
+    } else {
+      setTop(USERS.slice(0, 5));
+    }
   }, []);
   return (
     <div className="section">
       <div className="section-head">
         <div>
-          <div className="section-eyebrow"><span className="section-eyebrow-dot" /> Who's leading the way</div>
+          <div className="section-eyebrow">
+            <span className="section-eyebrow-dot" /> Who's leading the way
+          </div>
           <h2 className="section-title">Top navigators this month.</h2>
         </div>
         <div className="section-tools">
@@ -474,7 +603,11 @@ const MembersSection = ({ navigate }) => {
       </div>
       <div className="members-grid">
         {top.map((u, i) => (
-          <article key={u.handle} className="member-card" onClick={() => navigate({ view: 'profile', handle: u.handle })}>
+          <article
+            key={u.handle}
+            className="member-card"
+            onClick={() => navigate({ view: 'profile', handle: u.handle })}
+          >
             <div className="mc-rank">{String(i + 1).padStart(2, '0')}</div>
             <Avatar user={u} size={48} />
             <div className="mc-name">{u.name}</div>
@@ -492,32 +625,67 @@ const MembersSection = ({ navigate }) => {
 
 // ---------- Topic Row (used in feed + discussions) ----------
 const TopicRow = ({ topic, navigate }) => {
-  const cat = CATEGORIES.find(c => c.id === topic.cat);
+  const cat = CATEGORIES.find((c) => c.id === topic.cat);
   const author = userByHandle(topic.author);
   return (
     <article className="topic-row" onClick={() => navigate({ view: 'topic', topic: topic.id })}>
       <Avatar user={author} size={36} />
       <div className="tr-main">
         <div className="tr-titlebar">
-          {topic.pinned && <span className="tr-flag pin"><Icon name="pin" size={10} /> pinned</span>}
-          {topic.hot && <span className="tr-flag hot"><Icon name="flame" size={10} /> hot</span>}
-          {topic.validated && <span className="tr-flag validated"><Icon name="check" size={10} /> validated</span>}
-          {topic.locked && <span className="tr-flag lock"><Icon name="lock" size={10} /> {topic.locked}+</span>}
-          {topic.type === 'blog' && <span className="tr-flag blog" style={{ background: 'var(--brand-yellow)', color: '#000' }}><Icon name="edit" size={10} /> blog</span>}
+          {topic.pinned && (
+            <span className="tr-flag pin">
+              <Icon name="pin" size={10} /> pinned
+            </span>
+          )}
+          {topic.hot && (
+            <span className="tr-flag hot">
+              <Icon name="flame" size={10} /> hot
+            </span>
+          )}
+          {topic.validated && (
+            <span className="tr-flag validated">
+              <Icon name="check" size={10} /> validated
+            </span>
+          )}
+          {topic.locked && (
+            <span className="tr-flag lock">
+              <Icon name="lock" size={10} /> {topic.locked}+
+            </span>
+          )}
+          {topic.type === 'blog' && (
+            <span
+              className="tr-flag blog"
+              style={{ background: 'var(--brand-yellow)', color: '#000' }}
+            >
+              <Icon name="edit" size={10} /> blog
+            </span>
+          )}
           <h3 className="tr-title">{topic.title}</h3>
         </div>
         <div className="tr-meta">
           <CategoryPill cat={cat} />
-          {topic.tags.slice(0, 2).map(t => <span key={t} className="meta-tag">#{t}</span>)}
+          {topic.tags.slice(0, 2).map((t) => (
+            <span key={t} className="meta-tag">
+              #{t}
+            </span>
+          ))}
           <Dot />
-          <span className="meta-author">by <strong>{topic.author}</strong></span>
+          <span className="meta-author">
+            by <strong>{topic.author}</strong>
+          </span>
         </div>
       </div>
       <div className="tr-stats">
         <AvatarStack handles={topic.participants} size={22} max={4} />
         <div className="tr-numbers">
-          <div className="tr-stat"><span className="tr-stat-n">{formatNum(topic.replies)}</span><span className="tr-stat-l">replies</span></div>
-          <div className="tr-stat hide-md"><span className="tr-stat-n">{formatNum(topic.views)}</span><span className="tr-stat-l">views</span></div>
+          <div className="tr-stat">
+            <span className="tr-stat-n">{formatNum(topic.replies)}</span>
+            <span className="tr-stat-l">replies</span>
+          </div>
+          <div className="tr-stat hide-md">
+            <span className="tr-stat-n">{formatNum(topic.views)}</span>
+            <span className="tr-stat-l">views</span>
+          </div>
         </div>
         <div className="tr-activity">
           <span className="tr-act-time">{topic.lastActivity}</span>
@@ -529,23 +697,27 @@ const TopicRow = ({ topic, navigate }) => {
 
 // ---------- CATEGORY PAGE ----------
 const CategoryPage = ({ catId, navigate, onCompose, currentUser, showToast }) => {
-  const cat = CATEGORIES.find(c => c.id === catId);
+  const cat = CATEGORIES.find((c) => c.id === catId);
   const meta = CAT_META[catId];
   const [tab, setTab] = React.useState('latest');
   const locked = !canViewCategory(currentUser, catId);
   const canPost = canPostCategory(currentUser, catId);
-  const visibleTopics = TOPICS.filter(t => t.cat === catId && canViewTopic(currentUser, t));
-  const hiddenTopicCount = TOPICS.filter(t => t.cat === catId && !canViewTopic(currentUser, t)).length;
+  const visibleTopics = TOPICS.filter((t) => t.cat === catId && canViewTopic(currentUser, t));
+  const hiddenTopicCount = TOPICS.filter(
+    (t) => t.cat === catId && !canViewTopic(currentUser, t),
+  ).length;
   const [subscribed, setSubscribed] = React.useState(() => {
     try {
       const list = JSON.parse(localStorage.getItem('compass_subscriptions_v1') || '[]');
       return list.includes(catId);
-    } catch { return false; }
+    } catch {
+      return false;
+    }
   });
   const toggleSubscribe = () => {
     try {
       const list = JSON.parse(localStorage.getItem('compass_subscriptions_v1') || '[]');
-      const next = subscribed ? list.filter(id => id !== catId) : [...list, catId];
+      const next = subscribed ? list.filter((id) => id !== catId) : [...list, catId];
       localStorage.setItem('compass_subscriptions_v1', JSON.stringify(next));
       setSubscribed(!subscribed);
       showToast?.(subscribed ? 'Unsubscribed' : `Subscribed to ${cat.name}`);
@@ -568,7 +740,9 @@ const CategoryPage = ({ catId, navigate, onCompose, currentUser, showToast }) =>
           <span className="cat-hero-deco" />
           <div>
             <div className="cat-hero-eyebrow">
-              <span>{cat.code} / 08 · {cat.name}</span>
+              <span>
+                {cat.code} / 08 · {cat.name}
+              </span>
               {cat.premium && <span>· ✦ Premium</span>}
             </div>
             <h1 className="cat-hero-title">{cat.name}.</h1>
@@ -578,7 +752,9 @@ const CategoryPage = ({ catId, navigate, onCompose, currentUser, showToast }) =>
         <div className="category-locked-panel">
           <h2>Category locked</h2>
           <p>You don’t have enough level access to enter this discussion yet.</p>
-          <p className="locked-note">Reach {requiredLevelLabel(getCategoryAccess(catId).view)} to view {cat.name}.</p>
+          <p className="locked-note">
+            Reach {requiredLevelLabel(getCategoryAccess(catId).view)} to view {cat.name}.
+          </p>
         </div>
       </div>
     );
@@ -596,7 +772,9 @@ const CategoryPage = ({ catId, navigate, onCompose, currentUser, showToast }) =>
         <span className="cat-hero-deco" />
         <div>
           <div className="cat-hero-eyebrow">
-            <span>{cat.code} / 08 · {cat.name}</span>
+            <span>
+              {cat.code} / 08 · {cat.name}
+            </span>
             {cat.premium && <span>· ✦ Premium</span>}
           </div>
           <h1 className="cat-hero-title">{cat.name}.</h1>
@@ -609,7 +787,11 @@ const CategoryPage = ({ catId, navigate, onCompose, currentUser, showToast }) =>
                 <Icon name="plus" size={13} /> New post
               </button>
             )}
-            <button className="btn ghost btn-subscribe" style={isLight ? {} : { borderColor: 'rgba(255,255,255,0.3)', color: '#fff' }} onClick={toggleSubscribe}>
+            <button
+              className="btn ghost btn-subscribe"
+              style={isLight ? {} : { borderColor: 'rgba(255,255,255,0.3)', color: '#fff' }}
+              onClick={toggleSubscribe}
+            >
               {subscribed ? 'Subscribed' : 'Subscribe'}
             </button>
           </div>
@@ -620,20 +802,34 @@ const CategoryPage = ({ catId, navigate, onCompose, currentUser, showToast }) =>
         <div className="discussion-card">
           <div className="df-head">
             <div className="df-tabs">
-              {['latest','top','validated','mine'].map(f => (
-                <button key={f} className={`df-tab ${tab===f?'active':''}`} onClick={() => setTab(f)}>
-                  {f[0].toUpperCase()+f.slice(1)}
+              {['latest', 'top', 'validated', 'mine'].map((f) => (
+                <button
+                  key={f}
+                  className={`df-tab ${tab === f ? 'active' : ''}`}
+                  onClick={() => setTab(f)}
+                >
+                  {f[0].toUpperCase() + f.slice(1)}
                 </button>
               ))}
             </div>
             <div className="df-head-title">{visibleTopics.length} topics</div>
           </div>
-          {visibleTopics.length === 0
-            ? <div className="empty">No topics yet — be the first to post here.</div>
-            : visibleTopics.map(t => <TopicRow key={t.id} topic={t} navigate={navigate} />)}
+          {visibleTopics.length === 0 ? (
+            <div className="empty">No topics yet — be the first to post here.</div>
+          ) : (
+            visibleTopics.map((t) => <TopicRow key={t.id} topic={t} navigate={navigate} />)
+          )}
           {hiddenTopicCount > 0 && (
             <div className="empty locked-note">
-              {hiddenTopicCount} topic{hiddenTopicCount === 1 ? '' : 's'} are locked until you reach {requiredLevelLabel(Math.min(...TOPICS.filter(t => t.cat === catId && !canViewTopic(currentUser, t)).map(t => parseLockLevel(t.locked) || getCategoryAccess(catId).view)))}.
+              {hiddenTopicCount} topic{hiddenTopicCount === 1 ? '' : 's'} are locked until you reach{' '}
+              {requiredLevelLabel(
+                Math.min(
+                  ...TOPICS.filter((t) => t.cat === catId && !canViewTopic(currentUser, t)).map(
+                    (t) => parseLockLevel(t.locked) || getCategoryAccess(catId).view,
+                  ),
+                ),
+              )}
+              .
             </div>
           )}
         </div>
@@ -658,12 +854,30 @@ const FlaggedItem = ({ flag, onResolve }) => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div style={{ fontWeight: 600, fontSize: 14 }}>{flag.reason}</div>
-          <div style={{ fontSize: 12, color: '#888' }}>on {flag.target_type} · {new Date(flag.created_at).toLocaleString()}</div>
-          {details && <div style={{ fontSize: 13, marginTop: 4, color: '#444' }}>"{details.title?.slice(0, 100)}"</div>}
+          <div style={{ fontSize: 12, color: '#888' }}>
+            on {flag.target_type} · {new Date(flag.created_at).toLocaleString()}
+          </div>
+          {details && (
+            <div style={{ fontSize: 13, marginTop: 4, color: '#444' }}>
+              "{details.title?.slice(0, 100)}"
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button className="btn primary xs" onClick={() => onResolve(flag.id, true)} style={{ fontSize: 12, padding: '4px 10px' }}>Resolve</button>
-          <button className="btn ghost xs" onClick={() => onResolve(flag.id, false)} style={{ fontSize: 12, padding: '4px 10px' }}>Dismiss</button>
+          <button
+            className="btn primary xs"
+            onClick={() => onResolve(flag.id, true)}
+            style={{ fontSize: 12, padding: '4px 10px' }}
+          >
+            Resolve
+          </button>
+          <button
+            className="btn ghost xs"
+            onClick={() => onResolve(flag.id, false)}
+            style={{ fontSize: 12, padding: '4px 10px' }}
+          >
+            Dismiss
+          </button>
         </div>
       </div>
     </div>
@@ -672,30 +886,56 @@ const FlaggedItem = ({ flag, onResolve }) => {
 
 const ContentPage = ({ navigate, currentUser }) => {
   const canManage = canCreateEvent(currentUser);
-  if (!canManage) return <div className="view"><div className="empty">Access restricted to moderators and admins.</div></div>;
+  if (!canManage)
+    return (
+      <div className="view">
+        <div className="empty">Access restricted to moderators and admins.</div>
+      </div>
+    );
   const [modTab, setModTab] = React.useState('content');
   const [flags, setFlags] = React.useState([]);
   React.useEffect(() => {
     if (modTab === 'moderation') {
-      supabaseService.getFlags('open').then(setFlags).catch(() => {});
+      supabaseService
+        .getFlags('open')
+        .then(setFlags)
+        .catch(() => {});
     }
   }, [modTab]);
   const resolveFlag = async (id, resolved) => {
     await supabaseService.resolveFlag(id, resolved);
-    setFlags(prev => prev.filter(f => f.id !== id));
+    setFlags((prev) => prev.filter((f) => f.id !== id));
   };
   if (modTab === 'moderation') {
     return (
       <div className="view">
         <section className="lb-hero">
-          <div className="section-eyebrow"><span className="section-eyebrow-dot" /> Moderation</div>
-          <h1 className="section-title" style={{ fontSize: 'clamp(32px,4vw,48px)' }}>Flag queue.</h1>
-          <p className="section-sub">{flags.length} open flag{flags.length !== 1 ? 's' : ''} waiting for review.</p>
-          <button className="btn ghost sm" onClick={() => setModTab('content')} style={{ marginTop: 8 }}><Icon name="arrow-left" size={11} /> Back to content</button>
+          <div className="section-eyebrow">
+            <span className="section-eyebrow-dot" /> Moderation
+          </div>
+          <h1 className="section-title" style={{ fontSize: 'clamp(32px,4vw,48px)' }}>
+            Flag queue.
+          </h1>
+          <p className="section-sub">
+            {flags.length} open flag{flags.length !== 1 ? 's' : ''} waiting for review.
+          </p>
+          <button
+            className="btn ghost sm"
+            onClick={() => setModTab('content')}
+            style={{ marginTop: 8 }}
+          >
+            <Icon name="arrow-left" size={11} /> Back to content
+          </button>
         </section>
         <div style={{ marginTop: 24, border: '1px solid #e0e0e0', borderRadius: 8 }}>
-          {flags.length === 0 && <div className="empty" style={{ padding: 32 }}>No open flags. All clear.</div>}
-          {flags.map(f => <FlaggedItem key={f.id} flag={f} onResolve={resolveFlag} />)}
+          {flags.length === 0 && (
+            <div className="empty" style={{ padding: 32 }}>
+              No open flags. All clear.
+            </div>
+          )}
+          {flags.map((f) => (
+            <FlaggedItem key={f.id} flag={f} onResolve={resolveFlag} />
+          ))}
         </div>
       </div>
     );
@@ -703,18 +943,36 @@ const ContentPage = ({ navigate, currentUser }) => {
   return (
     <div className="view">
       <section className="lb-hero">
-        <div className="section-eyebrow"><span className="section-eyebrow-dot" /> Editorial</div>
-        <h1 className="section-title" style={{ fontSize: 'clamp(32px,4vw,48px)' }}>Content manager.</h1>
-        <p className="section-sub">Publish and manage editorial content — partner spotlights, research, field notes, tutorials, and more.</p>
-        <button className="btn ghost sm" onClick={() => setModTab('moderation')} style={{ marginTop: 8 }}><Icon name="alert" size={11} /> Moderation queue ({flags.length})</button>
+        <div className="section-eyebrow">
+          <span className="section-eyebrow-dot" /> Editorial
+        </div>
+        <h1 className="section-title" style={{ fontSize: 'clamp(32px,4vw,48px)' }}>
+          Content manager.
+        </h1>
+        <p className="section-sub">
+          Publish and manage editorial content — partner spotlights, research, field notes,
+          tutorials, and more.
+        </p>
+        <button
+          className="btn ghost sm"
+          onClick={() => setModTab('moderation')}
+          style={{ marginTop: 8 }}
+        >
+          <Icon name="alert" size={11} /> Moderation queue ({flags.length})
+        </button>
       </section>
       <div className="content-grid" style={{ marginTop: 24 }}>
-        {CONTENT_ITEMS.map(item => {
+        {CONTENT_ITEMS.map((item) => {
           const bg = CONTENT_BG[item.bg] || CONTENT_BG.navy;
           const author = userByHandle(item.author);
           return (
-            <article key={item.id} className="content-card" style={{ '--cc-from': bg.from, '--cc-to': bg.to }} onClick={() => navigate({ view: 'article', id: item.id })}>
-              <div className="cc-cover">
+            <article
+              key={item.id}
+              className="content-card"
+              style={{ '--cc-from': bg.from, '--cc-to': bg.to }}
+              onClick={() => navigate({ view: 'article', id: item.id })}
+            >
+              <div className="cc-cover" style={{ width: '100%' }}>
                 <div className="cc-grid" />
                 <div className="cc-rings" />
                 <div className="cc-kind">{`{ ${item.kind.toUpperCase()} }`}</div>
@@ -736,14 +994,27 @@ const ContentPage = ({ navigate, currentUser }) => {
         })}
       </div>
       <div style={{ marginTop: 24, display: 'flex', gap: 10 }}>
-        <button className="btn primary"><Icon name="plus" size={13} /> New piece</button>
+        <button className="btn primary">
+          <Icon name="plus" size={13} /> New piece
+        </button>
       </div>
     </div>
   );
 };
 
 Object.assign(window, {
-  HomeFeed, HeroCard, EventsSection, CategoriesSection, DiscussionsSection,
-  MembersSection, TopicRow, CategoryPage, OnlineMembersStrip, ContentSection,
-  SpacesSection, ContentPage, HomeFeedStream, CONTENT_BG,
+  HomeFeed,
+  HeroCard,
+  EventsSection,
+  CategoriesSection,
+  DiscussionsSection,
+  MembersSection,
+  TopicRow,
+  CategoryPage,
+  OnlineMembersStrip,
+  ContentSection,
+  SpacesSection,
+  ContentPage,
+  HomeFeedStream,
+  CONTENT_BG,
 });
